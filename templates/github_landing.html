@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMD OneClick - Loading Notebook</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo {
+            height: 40px;
+            margin-bottom: 16px;
+        }
+
+        .title {
+            font-size: 1.5rem;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .notebook-info {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .notebook-info-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .notebook-path {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9rem;
+            color: #333;
+            word-break: break-all;
+            background: #fff;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .github-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .github-link a {
+            color: #666;
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+
+        .github-link a:hover {
+            color: #333;
+            text-decoration: underline;
+        }
+
+        .status-section {
+            text-align: center;
+            padding: 24px 0;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e0e0e0;
+            border-top-color: #666;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status-text {
+            font-size: 1.1rem;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .status-detail {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #666, #888);
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+
+        .success-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 20px;
+            background: #4a4a4a;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .success-icon svg {
+            width: 32px;
+            height: 32px;
+            stroke: white;
+        }
+
+        .error-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 20px;
+            background: #dc3545;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .error-icon svg {
+            width: 32px;
+            height: 32px;
+            stroke: white;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 32px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            margin-top: 16px;
+        }
+
+        .btn-primary {
+            background: #4a4a4a;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #333;
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .redirect-notice {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <img src="https://oneclickamd.ai/static/amd.svg" alt="AMD" class="logo">
+                <h1 class="title">AMD OneClick Notebook</h1>
+            </div>
+
+            <div class="notebook-info">
+                <div class="notebook-info-label">Loading notebook from GitHub:</div>
+                <div class="notebook-path" id="notebookPath">{{ github_org }}/{{ github_repo }}/{{ github_path }}</div>
+                <div class="github-link">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                    </svg>
+                    <a href="https://github.com/{{ github_org }}/{{ github_repo }}/blob/{{ github_branch }}/{{ github_path }}" target="_blank">View on GitHub</a>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div class="status-section" id="loadingState">
+                <div class="spinner"></div>
+                <div class="status-text" id="statusText">Initializing...</div>
+                <div class="status-detail" id="statusDetail">Setting up your GPU-powered Jupyter environment</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressBar" style="width: 10%"></div>
+                </div>
+            </div>
+
+            <!-- Success State -->
+            <div class="status-section hidden" id="successState">
+                <div class="success-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                </div>
+                <div class="status-text">Notebook Ready!</div>
+                <div class="status-detail">Redirecting to your Jupyter environment...</div>
+                <a href="#" class="btn btn-primary" id="openNotebookBtn">Open Notebook</a>
+                <div class="redirect-notice">You will be redirected automatically in <span id="countdown">3</span> seconds</div>
+            </div>
+
+            <!-- Error State -->
+            <div class="status-section hidden" id="errorState">
+                <div class="error-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </div>
+                <div class="status-text">Something went wrong</div>
+                <div class="status-detail" id="errorDetail">Unable to create notebook instance</div>
+                <button class="btn btn-secondary" onclick="retryCreation()">Try Again</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const instanceId = "{{ instance_id }}";
+        const githubOrg = "{{ github_org }}";
+        const githubRepo = "{{ github_repo }}";
+        const githubPath = "{{ github_path }}";
+        const githubBranch = "{{ github_branch }}";
+        
+        let pollInterval = null;
+        let creationStarted = false;
+
+        const statusMessages = {
+            'pending': { text: 'Creating instance...', detail: 'Setting up your GPU-powered container', progress: 20 },
+            'creating': { text: 'Creating instance...', detail: 'Allocating AMD GPU resources', progress: 30 },
+            'initializing': { text: 'Initializing...', detail: 'Starting Jupyter server', progress: 50 },
+            'downloading': { text: 'Downloading notebook...', detail: `Fetching ${githubPath} from GitHub`, progress: 60 },
+            'jupyter_starting': { text: 'Almost ready...', detail: 'Waiting for Jupyter to become available', progress: 80 },
+            'running': { text: 'Ready!', detail: 'Your notebook is ready', progress: 100 }
+        };
+
+        async function createInstance() {
+            if (creationStarted) return;
+            creationStarted = true;
+
+            try {
+                const response = await fetch('/api/github/notebook/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        org: githubOrg,
+                        repo: githubRepo,
+                        branch: githubBranch,
+                        path: githubPath
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showError(data.detail || 'Failed to create instance');
+                    return;
+                }
+
+                // If already running, redirect immediately
+                if (data.status === 'running' && data.url) {
+                    showSuccess(data.url);
+                    return;
+                }
+
+                // Start polling for status
+                startPolling();
+
+            } catch (error) {
+                console.error('Error creating instance:', error);
+                showError('Network error. Please check your connection.');
+            }
+        }
+
+        function startPolling() {
+            pollInterval = setInterval(checkStatus, 2000);
+        }
+
+        async function checkStatus() {
+            try {
+                const response = await fetch(`/api/github/notebook/status?instance_id=${encodeURIComponent(instanceId)}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showError(data.detail || 'Failed to check status');
+                    return;
+                }
+
+                updateStatus(data.status);
+
+                if (data.status === 'running' && data.url) {
+                    clearInterval(pollInterval);
+                    showSuccess(data.url);
+                } else if (data.status === 'error' || data.status === 'not_found') {
+                    clearInterval(pollInterval);
+                    showError('Instance creation failed or was not found');
+                }
+
+            } catch (error) {
+                console.error('Error checking status:', error);
+            }
+        }
+
+        function updateStatus(status) {
+            const info = statusMessages[status] || statusMessages['pending'];
+            document.getElementById('statusText').textContent = info.text;
+            document.getElementById('statusDetail').textContent = info.detail;
+            document.getElementById('progressBar').style.width = info.progress + '%';
+        }
+
+        function showSuccess(url) {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('successState').classList.remove('hidden');
+            document.getElementById('openNotebookBtn').href = url;
+
+            let countdown = 3;
+            const countdownEl = document.getElementById('countdown');
+            
+            const timer = setInterval(() => {
+                countdown--;
+                countdownEl.textContent = countdown;
+                if (countdown <= 0) {
+                    clearInterval(timer);
+                    window.location.href = url;
+                }
+            }, 1000);
+        }
+
+        function showError(message) {
+            clearInterval(pollInterval);
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('errorState').classList.remove('hidden');
+            document.getElementById('errorDetail').textContent = message;
+            creationStarted = false;
+        }
+
+        function retryCreation() {
+            document.getElementById('errorState').classList.add('hidden');
+            document.getElementById('loadingState').classList.remove('hidden');
+            document.getElementById('progressBar').style.width = '10%';
+            createInstance();
+        }
+
+        // Start creation on page load
+        document.addEventListener('DOMContentLoaded', createInstance);
+    </script>
+</body>
+</html>
