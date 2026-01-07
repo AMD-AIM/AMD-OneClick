@@ -46,9 +46,64 @@ class K8sClient:
             "email-hash": hashlib.md5(email.lower().encode()).hexdigest()[:16],
         }
     
-    def _get_pod_manifest(self, email: str, instance_id: str, image: str) -> dict:
+    def _get_pod_manifest(self, email: str, instance_id: str, image: str, 
+                          github_info: Optional[dict] = None) -> dict:
         """Generate Pod manifest"""
         labels = self._get_labels(email, instance_id)
+        
+        annotations = {
+            "amd-oneclick/email": email,
+            "amd-oneclick/created-at": datetime.now(timezone.utc).isoformat(),
+        }
+        
+        # Add GitHub info to annotations if provided
+        if github_info:
+            annotations["amd-oneclick/github-org"] = github_info.get("org", "")
+            annotations["amd-oneclick/github-repo"] = github_info.get("repo", "")
+            annotations["amd-oneclick/github-branch"] = github_info.get("branch", "")
+            annotations["amd-oneclick/github-path"] = github_info.get("path", "")
+            annotations["amd-oneclick/github-raw-url"] = github_info.get("raw_url", "")
+        
+        # Build the startup command
+        if github_info:
+            # Download the notebook file before starting Jupyter
+            notebook_filename = github_info["path"].split("/")[-1]
+            startup_script = f"""
+echo "{settings.PYPI_HOST_IP} {settings.PYPI_HOST}" >> /etc/hosts
+mkdir -p ~/.pip
+cat > ~/.pip/pip.conf << EOF
+[global]
+index-url = {settings.PYPI_MIRROR}
+trusted-host = {settings.PYPI_HOST}
+EOF
+pip install --no-cache-dir jupyter ihighlight
+mkdir -p /app/notebooks
+cd /app/notebooks
+python -c "
+import urllib.request
+import ssl
+ssl_ctx = ssl.create_default_context()
+ssl_ctx.check_hostname = False
+ssl_ctx.verify_mode = ssl.CERT_NONE
+url = '{github_info["raw_url"]}'
+urllib.request.urlretrieve(url, '{notebook_filename}')
+print('Downloaded: {notebook_filename}')
+"
+jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-root --ServerApp.token='{settings.NOTEBOOK_TOKEN}' --notebook-dir=/app/notebooks
+"""
+        else:
+            startup_script = f"""
+echo "{settings.PYPI_HOST_IP} {settings.PYPI_HOST}" >> /etc/hosts
+mkdir -p ~/.pip
+cat > ~/.pip/pip.conf << EOF
+[global]
+index-url = {settings.PYPI_MIRROR}
+trusted-host = {settings.PYPI_HOST}
+EOF
+pip install --no-cache-dir jupyter ihighlight
+cd /app
+jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-root --ServerApp.token='{settings.NOTEBOOK_TOKEN}'
+"""
         
         return {
             "apiVersion": "v1",
@@ -57,10 +112,7 @@ class K8sClient:
                 "name": instance_id,
                 "namespace": self.namespace,
                 "labels": labels,
-                "annotations": {
-                    "amd-oneclick/email": email,
-                    "amd-oneclick/created-at": datetime.now(timezone.utc).isoformat(),
-                }
+                "annotations": annotations
             },
             "spec": {
                 "tolerations": [
@@ -76,20 +128,7 @@ class K8sClient:
                         "image": image,
                         "imagePullPolicy": "IfNotPresent",
                         "command": ["/bin/bash", "-c"],
-                        "args": [
-                            f"""
-echo "{settings.PYPI_HOST_IP} {settings.PYPI_HOST}" >> /etc/hosts
-mkdir -p ~/.pip
-cat > ~/.pip/pip.conf << EOF
-[global]
-index-url = {settings.PYPI_MIRROR}
-trusted-host = {settings.PYPI_HOST}
-EOF
-pip install --no-cache-dir jupyter ihighlight
-cd /app
-jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-root --ServerApp.token='{settings.NOTEBOOK_TOKEN}'
-"""
-                        ],
+                        "args": [startup_script],
                         "ports": [
                             {
                                 "containerPort": settings.NOTEBOOK_PORT,
@@ -215,17 +254,24 @@ jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-ro
                 return None
             raise
     
-    def _build_url(self, node_port: int) -> str:
+    def _build_url(self, node_port: int, notebook_path: Optional[str] = None) -> str:
         """Build notebook URL"""
-        return f"http://{settings.SERVICE_HOST}:{node_port}/lab?token={settings.NOTEBOOK_TOKEN}"
+        base_url = f"http://{settings.SERVICE_HOST}:{node_port}/lab?token={settings.NOTEBOOK_TOKEN}"
+        if notebook_path:
+            # Add notebook path to URL for direct open
+            notebook_filename = notebook_path.split("/")[-1]
+            return f"http://{settings.SERVICE_HOST}:{node_port}/lab/tree/{notebook_filename}?token={settings.NOTEBOOK_TOKEN}"
+        return base_url
     
-    def create_instance(self, email: str, image: Optional[str] = None) -> dict:
+    def create_instance(self, email: str, image: Optional[str] = None, 
+                        github_info: Optional[dict] = None,
+                        custom_instance_id: Optional[str] = None) -> dict:
         """Create a new notebook instance"""
-        instance_id = self._generate_instance_id(email)
+        instance_id = custom_instance_id or self._generate_instance_id(email)
         image = image or settings.DEFAULT_IMAGE
         
         # Check if instance already exists
-        existing = self.get_instance_by_email(email)
+        existing = self.get_instance_by_id(instance_id)
         if existing:
             return existing
         
@@ -233,7 +279,7 @@ jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-ro
         node_port = self._allocate_node_port()
         
         # Create Pod
-        pod_manifest = self._get_pod_manifest(email, instance_id, image)
+        pod_manifest = self._get_pod_manifest(email, instance_id, image, github_info)
         try:
             self.core_v1.create_namespaced_pod(
                 namespace=self.namespace,
@@ -255,8 +301,10 @@ jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-ro
         except ApiException as e:
             logger.error(f"Failed to create service: {e}")
             # Cleanup pod if service creation fails
-            self.delete_instance(email)
+            self.delete_instance_by_id(instance_id)
             raise
+        
+        notebook_path = github_info.get("path") if github_info else None
         
         return {
             "id": instance_id,
@@ -267,12 +315,52 @@ jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-ro
             "status": "pending",
             "created_at": datetime.now(timezone.utc),
             "node_port": node_port,
-            "url": self._build_url(node_port)
+            "url": self._build_url(node_port, notebook_path),
+            "github_info": github_info
         }
     
-    def delete_instance(self, email: str) -> bool:
-        """Delete a notebook instance"""
-        instance_id = self._generate_instance_id(email)
+    def get_instance_by_id(self, instance_id: str) -> Optional[dict]:
+        """Get existing notebook instance by instance ID"""
+        try:
+            pod = self.core_v1.read_namespaced_pod(
+                name=instance_id,
+                namespace=self.namespace
+            )
+            
+            # Get associated service
+            try:
+                svc = self.core_v1.read_namespaced_service(
+                    name=f"{instance_id}-svc",
+                    namespace=self.namespace
+                )
+                node_port = svc.spec.ports[0].node_port if svc.spec.ports else None
+            except ApiException:
+                node_port = None
+            
+            email = pod.metadata.annotations.get("amd-oneclick/email", "unknown")
+            github_path = pod.metadata.annotations.get("amd-oneclick/github-path")
+            
+            return {
+                "id": instance_id,
+                "email": email,
+                "pod_name": pod.metadata.name,
+                "service_name": f"{instance_id}-svc",
+                "image": pod.spec.containers[0].image,
+                "status": pod.status.phase.lower(),
+                "created_at": pod.metadata.creation_timestamp,
+                "node_port": node_port,
+                "url": self._build_url(node_port, github_path) if node_port else None,
+                "github_org": pod.metadata.annotations.get("amd-oneclick/github-org"),
+                "github_repo": pod.metadata.annotations.get("amd-oneclick/github-repo"),
+                "github_path": github_path,
+            }
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            raise
+    
+    def delete_instance_by_id(self, instance_id: str) -> bool:
+        """Delete a notebook instance by instance ID"""
         deleted = False
         
         # Delete Service
@@ -301,6 +389,11 @@ jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-ro
         
         return deleted
     
+    def delete_instance(self, email: str) -> bool:
+        """Delete a notebook instance"""
+        instance_id = self._generate_instance_id(email)
+        return self.delete_instance_by_id(instance_id)
+    
     def list_instances(self) -> list:
         """List all notebook instances"""
         instances = []
@@ -315,6 +408,11 @@ jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-ro
                 instance_id = pod.metadata.labels.get("instance-id", "unknown")
                 email = pod.metadata.annotations.get("amd-oneclick/email", "unknown")
                 created_at = pod.metadata.creation_timestamp
+                
+                # Get GitHub info from annotations
+                github_org = pod.metadata.annotations.get("amd-oneclick/github-org")
+                github_repo = pod.metadata.annotations.get("amd-oneclick/github-repo")
+                github_path = pod.metadata.annotations.get("amd-oneclick/github-path")
                 
                 # Get NodePort from service
                 node_port = None
@@ -342,8 +440,11 @@ jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-ro
                     "status": pod.status.phase.lower() if pod.status.phase else "unknown",
                     "created_at": created_at.isoformat() if created_at else None,
                     "node_port": node_port,
-                    "url": self._build_url(node_port) if node_port else None,
-                    "uptime_minutes": uptime_minutes
+                    "url": self._build_url(node_port, github_path) if node_port else None,
+                    "uptime_minutes": uptime_minutes,
+                    "github_org": github_org,
+                    "github_repo": github_repo,
+                    "github_path": github_path,
                 })
         except ApiException as e:
             logger.error(f"Error listing pods: {e}")
@@ -361,9 +462,10 @@ jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-ro
         
         return deleted_count
     
-    def get_pod_status(self, email: str) -> Optional[str]:
+    def get_pod_status(self, email: str, instance_id: Optional[str] = None) -> Optional[str]:
         """Get the current status of a pod"""
-        instance_id = self._generate_instance_id(email)
+        if not instance_id:
+            instance_id = self._generate_instance_id(email)
         
         try:
             pod = self.core_v1.read_namespaced_pod(
@@ -378,7 +480,7 @@ jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-ro
                 container_status = pod.status.container_statuses[0]
                 if container_status.ready:
                     # Container is ready, but we need to verify Jupyter is actually responding
-                    instance = self.get_instance_by_email(email)
+                    instance = self.get_instance_by_id(instance_id)
                     if instance and instance.get("node_port"):
                         if self._check_jupyter_ready(instance["node_port"]):
                             return "ready"

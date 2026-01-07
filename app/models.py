@@ -12,6 +12,15 @@ class NotebookRequest(BaseModel):
     image: Optional[str] = None
 
 
+class GitHubNotebookInfo(BaseModel):
+    """GitHub notebook information"""
+    org: str
+    repo: str
+    branch: str
+    path: str
+    raw_url: str
+
+
 class NotebookInstance(BaseModel):
     """Model representing a notebook instance"""
     id: str
@@ -24,6 +33,7 @@ class NotebookInstance(BaseModel):
     created_at: datetime
     last_activity: Optional[datetime] = None
     node_port: Optional[int] = None
+    github_info: Optional[GitHubNotebookInfo] = None
 
 
 class NotebookStatus(BaseModel):
@@ -32,6 +42,7 @@ class NotebookStatus(BaseModel):
     message: str
     url: Optional[str] = None
     email: Optional[str] = None
+    instance_id: Optional[str] = None
 
 
 class NotebookListItem(BaseModel):
@@ -44,6 +55,9 @@ class NotebookListItem(BaseModel):
     created_at: str
     last_activity: Optional[str] = None
     uptime_minutes: int
+    github_org: Optional[str] = None
+    github_repo: Optional[str] = None
+    github_path: Optional[str] = None
 
 
 class AdminListResponse(BaseModel):
