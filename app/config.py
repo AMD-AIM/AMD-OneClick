@@ -8,7 +8,6 @@ from typing import Optional
 class Settings:
     # K8s Configuration
     K8S_NAMESPACE: str = os.getenv("K8S_NAMESPACE", "default")
-    K8S_NODE_NAME: str = os.getenv("K8S_NODE_NAME", "wx-ms-w7900d-0004")
     
     # Default Notebook Image
     DEFAULT_IMAGE: str = os.getenv(

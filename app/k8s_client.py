@@ -62,7 +62,6 @@ class K8sClient:
                 }
             },
             "spec": {
-                "nodeName": settings.K8S_NODE_NAME,
                 "tolerations": [
                     {
                         "key": "amd.com/gpu",

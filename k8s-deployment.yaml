@@ -1,52 +1,34 @@
-# =============================================================================
 # AMD OneClick Notebook Manager - Kubernetes Deployment
-# =============================================================================
-# This deployment includes:
-# - ServiceAccount with RBAC permissions for K8s API access
-# - ConfigMap for application configuration
-# - Deployment for the manager application
-# - Service to expose the application
-# =============================================================================
-
 ---
-# ServiceAccount for the manager
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: amd-oneclick-manager
   namespace: default
-  labels:
-    app: amd-oneclick-manager
 
 ---
-# ClusterRole for managing pods and services
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name: amd-oneclick-manager
-  labels:
-    app: amd-oneclick-manager
+  namespace: default
 rules:
-  # Pod management
   - apiGroups: [""]
     resources: ["pods", "pods/log"]
     verbs: ["get", "list", "watch", "create", "delete"]
-  # Service management
   - apiGroups: [""]
     resources: ["services"]
     verbs: ["get", "list", "watch", "create", "delete"]
 
 ---
-# ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: amd-oneclick-manager
-  labels:
-    app: amd-oneclick-manager
+  namespace: default
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: amd-oneclick-manager
 subjects:
   - kind: ServiceAccount
@@ -54,71 +36,41 @@ subjects:
     namespace: default
 
 ---
-# ConfigMap for configuration
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: amd-oneclick-config
   namespace: default
-  labels:
-    app: amd-oneclick-manager
 data:
-  # Kubernetes configuration
   K8S_NAMESPACE: "default"
-  K8S_NODE_NAME: "wx-ms-w7900d-0004"
-  
-  # Default notebook image
   DEFAULT_IMAGE: "docker.io/rocm/vllm-dev:rocm7.1.1_navi_ubuntu24.04_py3.12_pytorch_2.8_vllm_0.10.2rc1"
-  
-  # Resource configuration
   CPU_LIMIT: "128"
   MEMORY_LIMIT: "256Gi"
   GPU_LIMIT: "1"
   CPU_REQUEST: "40"
   MEMORY_REQUEST: "48Gi"
-  
-  # Cleanup configuration
   IDLE_TIMEOUT_MINUTES: "10"
   MAX_LIFETIME_HOURS: "6"
-  
-  # Service host (external IP or hostname for notebook URLs)
-  # Update this to the actual external IP or hostname
   SERVICE_HOST: "36.151.243.69"
   NODE_PORT_BASE: "30000"
-  
-  # Notebook configuration
   NOTEBOOK_TOKEN: "amd-oneclick"
 
 ---
-# Secret for sensitive configuration
 apiVersion: v1
 kind: Secret
 metadata:
   name: amd-oneclick-secrets
   namespace: default
-  labels:
-    app: amd-oneclick-manager
 type: Opaque
 stringData:
-  # Admin password for admin panel
   ADMIN_PASSWORD: "admin123"
-  
-  # SMTP configuration (optional - uncomment and configure if needed)
-  # SMTP_HOST: "smtp.example.com"
-  # SMTP_PORT: "587"
-  # SMTP_USER: "your-smtp-user"
-  # SMTP_PASSWORD: "your-smtp-password"
-  # SMTP_FROM: "noreply@example.com"
 
 ---
-# Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: amd-oneclick-manager
   namespace: default
-  labels:
-    app: amd-oneclick-manager
 spec:
   replicas: 1
   selector:
@@ -132,13 +84,17 @@ spec:
       serviceAccountName: amd-oneclick-manager
       containers:
         - name: manager
-          # Build and push this image to your registry, then update the image reference
-          # For local testing, you can build with: docker build -t amd-oneclick-manager:latest .
-          image: amd-oneclick-manager:latest
+          image: python:3.12-slim
           imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command:
+            - /bin/bash
+            - -c
+            - |
+              pip install --no-cache-dir -q fastapi uvicorn[standard] kubernetes pydantic[email] apscheduler python-multipart jinja2 &&
+              uvicorn app.main:app --host 0.0.0.0 --port 8000
           ports:
             - containerPort: 8000
-              name: http
           envFrom:
             - configMapRef:
                 name: amd-oneclick-config
@@ -151,34 +107,39 @@ spec:
             requests:
               cpu: "500m"
               memory: "256Mi"
+          volumeMounts:
+            - name: app-code
+              mountPath: /app
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 10
+            initialDelaySeconds: 60
             periodSeconds: 30
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 5
+            initialDelaySeconds: 30
             periodSeconds: 10
+      volumes:
+        - name: app-code
+          projected:
+            sources:
+              - configMap:
+                  name: amd-oneclick-app
 
 ---
-# Service
 apiVersion: v1
 kind: Service
 metadata:
   name: amd-oneclick-manager
   namespace: default
-  labels:
-    app: amd-oneclick-manager
 spec:
   selector:
     app: amd-oneclick-manager
   type: NodePort
   ports:
-    - name: http
-      port: 80
+    - port: 80
       targetPort: 8000
       nodePort: 30080
