@@ -74,36 +74,21 @@ class K8sClient:
 mkdir -p /app/notebooks
 cd /app/notebooks
 
-# Download notebook with retry logic
-python3 << 'DOWNLOAD_SCRIPT'
-import urllib.request
-import ssl
-import time
-import socket
-
-# Set timeout
-socket.setdefaulttimeout(30)
-
-ssl_ctx = ssl.create_default_context()
-ssl_ctx.check_hostname = False
-ssl_ctx.verify_mode = ssl.CERT_NONE
-
-url = '{github_info["raw_url"]}'
-filename = '{notebook_filename}'
-
-for attempt in range(3):
-    try:
-        print(f"Downloading {{filename}} (attempt {{attempt + 1}}/3)...")
-        urllib.request.urlretrieve(url, filename)
-        print(f"Downloaded: {{filename}}")
+# Download notebook with curl (more reliable than Python urllib)
+echo "Downloading {notebook_filename}..."
+for i in 1 2 3; do
+    if curl -fsSL --connect-timeout 30 --max-time 120 -o '{notebook_filename}' '{github_info["raw_url"]}'; then
+        echo "Downloaded: {notebook_filename}"
         break
-    except Exception as e:
-        print(f"Attempt {{attempt + 1}} failed: {{e}}")
-        if attempt < 2:
-            time.sleep(2)
-        else:
-            print("Warning: Failed to download notebook, starting with empty directory")
-DOWNLOAD_SCRIPT
+    else
+        echo "Attempt $i failed, retrying..."
+        sleep 2
+    fi
+done
+
+if [ ! -f '{notebook_filename}' ]; then
+    echo "Warning: Failed to download notebook, starting with empty directory"
+fi
 
 jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-root --ServerApp.token='{settings.NOTEBOOK_TOKEN}' --notebook-dir=/app/notebooks
 """
