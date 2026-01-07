@@ -65,42 +65,50 @@ class K8sClient:
             annotations["amd-oneclick/github-raw-url"] = github_info.get("raw_url", "")
         
         # Build the startup command
+        # Note: Jupyter is pre-installed in the base image, no pip install needed
+        # DNS is configured via Pod dnsConfig to use Google DNS (8.8.8.8)
         if github_info:
             # Download the notebook file before starting Jupyter
             notebook_filename = github_info["path"].split("/")[-1]
             startup_script = f"""
-echo "{settings.PYPI_HOST_IP} {settings.PYPI_HOST}" >> /etc/hosts
-mkdir -p ~/.pip
-cat > ~/.pip/pip.conf << EOF
-[global]
-index-url = {settings.PYPI_MIRROR}
-trusted-host = {settings.PYPI_HOST}
-EOF
-pip install --no-cache-dir jupyter ihighlight
 mkdir -p /app/notebooks
 cd /app/notebooks
-python -c "
+
+# Download notebook with retry logic
+python3 << 'DOWNLOAD_SCRIPT'
 import urllib.request
 import ssl
+import time
+import socket
+
+# Set timeout
+socket.setdefaulttimeout(30)
+
 ssl_ctx = ssl.create_default_context()
 ssl_ctx.check_hostname = False
 ssl_ctx.verify_mode = ssl.CERT_NONE
+
 url = '{github_info["raw_url"]}'
-urllib.request.urlretrieve(url, '{notebook_filename}')
-print('Downloaded: {notebook_filename}')
-"
+filename = '{notebook_filename}'
+
+for attempt in range(3):
+    try:
+        print(f"Downloading {{filename}} (attempt {{attempt + 1}}/3)...")
+        urllib.request.urlretrieve(url, filename)
+        print(f"Downloaded: {{filename}}")
+        break
+    except Exception as e:
+        print(f"Attempt {{attempt + 1}} failed: {{e}}")
+        if attempt < 2:
+            time.sleep(2)
+        else:
+            print("Warning: Failed to download notebook, starting with empty directory")
+DOWNLOAD_SCRIPT
+
 jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-root --ServerApp.token='{settings.NOTEBOOK_TOKEN}' --notebook-dir=/app/notebooks
 """
         else:
             startup_script = f"""
-echo "{settings.PYPI_HOST_IP} {settings.PYPI_HOST}" >> /etc/hosts
-mkdir -p ~/.pip
-cat > ~/.pip/pip.conf << EOF
-[global]
-index-url = {settings.PYPI_MIRROR}
-trusted-host = {settings.PYPI_HOST}
-EOF
-pip install --no-cache-dir jupyter ihighlight
 cd /app
 jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-root --ServerApp.token='{settings.NOTEBOOK_TOKEN}'
 """
@@ -115,6 +123,14 @@ jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-ro
                 "annotations": annotations
             },
             "spec": {
+                "dnsPolicy": "None",
+                "dnsConfig": {
+                    "nameservers": ["8.8.8.8", "8.8.4.4"],
+                    "searches": ["default.svc.cluster.local", "svc.cluster.local", "cluster.local"],
+                    "options": [
+                        {"name": "ndots", "value": "5"}
+                    ]
+                },
                 "tolerations": [
                     {
                         "key": "amd.com/gpu",

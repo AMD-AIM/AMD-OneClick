@@ -43,7 +43,7 @@ metadata:
   namespace: default
 data:
   K8S_NAMESPACE: "default"
-  DEFAULT_IMAGE: "docker.io/rocm/vllm-dev:rocm7.1.1_navi_ubuntu24.04_py3.12_pytorch_2.8_vllm_0.10.2rc1"
+  DEFAULT_IMAGE: "docker.io/vivienfanghua/amd-jupyter:latest"
   CPU_LIMIT: "128"
   MEMORY_LIMIT: "256Gi"
   GPU_LIMIT: "1"
