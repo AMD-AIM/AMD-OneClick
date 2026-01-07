@@ -294,17 +294,14 @@
             creationStarted = true;
 
             try {
-                const response = await fetch('/api/github/notebook/create', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        org: githubOrg,
-                        repo: githubRepo,
-                        branch: githubBranch,
-                        path: githubPath
-                    })
+                const params = new URLSearchParams({
+                    org: githubOrg,
+                    repo: githubRepo,
+                    branch: githubBranch,
+                    path: githubPath
+                });
+                const response = await fetch('/api/github/notebook/create?' + params.toString(), {
+                    method: 'POST'
                 });
 
                 const data = await response.json();
