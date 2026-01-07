@@ -84,7 +84,7 @@ spec:
       serviceAccountName: amd-oneclick-manager
       containers:
         - name: manager
-          image: ghcr.io/amd-aim/amd-oneclick:latest
+          image: docker.io/vivienfanghua/amd-oneclick:latest
           imagePullPolicy: Always
           workingDir: /app
           ports:

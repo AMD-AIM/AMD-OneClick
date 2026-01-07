@@ -173,7 +173,8 @@ async def check_status(email: str = Query(..., description="User email")):
         
         status_messages = {
             "ready": "Your notebook is ready!",
-            "running": "Your notebook is running!",
+            "running": "Container is running, starting Jupyter...",
+            "jupyter_starting": "Jupyter is starting up...",
             "pending": "Waiting for resources...",
             "initializing": "Initializing notebook environment...",
             "loading": "Loading notebook image...",

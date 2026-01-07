@@ -14,15 +14,15 @@
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            background: #f5f5f7;
             min-height: 100vh;
-            color: #fff;
+            color: #1d1d1f;
         }
 
         .container {
-            max-width: 600px;
+            max-width: 480px;
             margin: 0 auto;
-            padding: 40px 20px;
+            padding: 60px 20px;
         }
 
         .header {
@@ -35,13 +35,13 @@
             align-items: center;
             justify-content: center;
             gap: 12px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
 
         .logo-icon {
             width: 48px;
             height: 48px;
-            background: linear-gradient(135deg, #ed1c24, #ff6b6b);
+            background: #86868b;
             border-radius: 12px;
             display: flex;
             align-items: center;
@@ -52,23 +52,20 @@
         .logo-text {
             font-size: 28px;
             font-weight: 700;
-            background: linear-gradient(135deg, #ed1c24, #ff6b6b);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #1d1d1f;
         }
 
         .subtitle {
-            color: #8892b0;
-            font-size: 16px;
+            color: #86868b;
+            font-size: 15px;
         }
 
         .card {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #ffffff;
+            border: 1px solid #d2d2d7;
             border-radius: 16px;
             padding: 32px;
-            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
         }
 
         .form-group {
@@ -79,46 +76,46 @@
             display: block;
             margin-bottom: 8px;
             font-weight: 500;
-            color: #ccd6f6;
+            color: #1d1d1f;
+            font-size: 14px;
         }
 
         .form-input, .form-select {
             width: 100%;
             padding: 14px 16px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 8px;
-            color: #fff;
-            font-size: 16px;
-            transition: all 0.3s ease;
+            background: #f5f5f7;
+            border: 1px solid #d2d2d7;
+            border-radius: 10px;
+            color: #1d1d1f;
+            font-size: 15px;
+            transition: all 0.2s ease;
         }
 
         .form-input:focus, .form-select:focus {
             outline: none;
-            border-color: #ed1c24;
-            box-shadow: 0 0 0 3px rgba(237, 28, 36, 0.2);
+            border-color: #86868b;
+            background: #ffffff;
         }
 
         .form-input::placeholder {
-            color: #5c6370;
+            color: #86868b;
         }
 
-        .form-select option {
-            background: #1a1a2e;
-            color: #fff;
+        .form-select {
+            cursor: pointer;
         }
 
         .btn {
             width: 100%;
             padding: 16px 24px;
-            background: linear-gradient(135deg, #ed1c24, #c41e24);
+            background: #1d1d1f;
             border: none;
-            border-radius: 8px;
-            color: #fff;
-            font-size: 16px;
+            border-radius: 10px;
+            color: #ffffff;
+            font-size: 15px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -126,14 +123,12 @@
         }
 
         .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(237, 28, 36, 0.4);
+            background: #424245;
         }
 
         .btn:disabled {
-            opacity: 0.6;
+            opacity: 0.5;
             cursor: not-allowed;
-            transform: none;
         }
 
         .status-container {
@@ -147,10 +142,10 @@
         }
 
         .spinner {
-            width: 48px;
-            height: 48px;
-            border: 4px solid rgba(237, 28, 36, 0.2);
-            border-top-color: #ed1c24;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #d2d2d7;
+            border-top-color: #86868b;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin: 0 auto 20px;
@@ -161,63 +156,65 @@
         }
 
         .status-text {
-            font-size: 18px;
-            font-weight: 500;
+            font-size: 17px;
+            font-weight: 600;
             margin-bottom: 8px;
+            color: #1d1d1f;
         }
 
         .status-message {
-            color: #8892b0;
+            color: #86868b;
             font-size: 14px;
         }
 
         .success-icon {
-            width: 64px;
-            height: 64px;
-            background: linear-gradient(135deg, #00c853, #00e676);
+            width: 56px;
+            height: 56px;
+            background: #86868b;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0 auto 20px;
-            font-size: 32px;
+            font-size: 28px;
+            color: #ffffff;
         }
 
         .notebook-url {
             display: block;
-            padding: 16px;
-            background: rgba(0, 200, 83, 0.1);
-            border: 1px solid rgba(0, 200, 83, 0.3);
-            border-radius: 8px;
-            color: #00e676;
+            padding: 14px;
+            background: #f5f5f7;
+            border: 1px solid #d2d2d7;
+            border-radius: 10px;
+            color: #1d1d1f;
             text-decoration: none;
-            font-family: monospace;
-            font-size: 14px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 12px;
             word-break: break-all;
             margin: 16px 0;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
         }
 
         .notebook-url:hover {
-            background: rgba(0, 200, 83, 0.2);
+            background: #e8e8ed;
         }
 
         .btn-secondary {
             background: transparent;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid #d2d2d7;
+            color: #1d1d1f;
             margin-top: 12px;
         }
 
         .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.05);
-            box-shadow: none;
+            background: #f5f5f7;
         }
 
         .error-container {
-            background: rgba(255, 82, 82, 0.1);
-            border: 1px solid rgba(255, 82, 82, 0.3);
-            border-radius: 8px;
-            padding: 16px;
+            background: #faf5f5;
+            border: 1px solid #e0d5d5;
+            border-radius: 10px;
+            padding: 14px;
             margin-top: 16px;
             display: none;
         }
@@ -227,42 +224,24 @@
         }
 
         .error-text {
-            color: #ff5252;
+            color: #6b5555;
             font-size: 14px;
-        }
-
-        .features {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            margin-top: 32px;
-        }
-
-        .feature {
-            text-align: center;
-            padding: 16px;
-        }
-
-        .feature-icon {
-            font-size: 24px;
-            margin-bottom: 8px;
-        }
-
-        .feature-title {
-            font-size: 12px;
-            color: #8892b0;
         }
 
         .footer {
             text-align: center;
-            margin-top: 40px;
-            color: #5c6370;
-            font-size: 12px;
+            margin-top: 32px;
+            color: #86868b;
+            font-size: 13px;
         }
 
         .footer a {
-            color: #ed1c24;
+            color: #1d1d1f;
             text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -270,10 +249,10 @@
     <div class="container">
         <div class="header">
             <div class="logo">
-                <div class="logo-icon">🚀</div>
+                <div class="logo-icon">⚡</div>
                 <span class="logo-text">AMD OneClick</span>
             </div>
-            <p class="subtitle">GPU-Powered Jupyter Notebooks in Seconds</p>
+            <p class="subtitle">GPU-Powered Jupyter Notebooks</p>
         </div>
 
         <div class="card">
@@ -302,7 +281,6 @@
                 </div>
 
                 <button type="button" class="btn" id="requestBtn" onclick="requestNotebook()">
-                    <span>🚀</span>
                     Request Notebook
                 </button>
 
@@ -332,26 +310,8 @@
             </div>
         </div>
 
-        <div class="features">
-            <div class="feature">
-                <div class="feature-icon">⚡</div>
-                <p class="feature-title">AMD GPU Powered</p>
-            </div>
-            <div class="feature">
-                <div class="feature-icon">🔒</div>
-                <p class="feature-title">Secure & Isolated</p>
-            </div>
-            <div class="feature">
-                <div class="feature-icon">🎯</div>
-                <p class="feature-title">One-Click Deploy</p>
-            </div>
-        </div>
-
         <div class="footer">
-            <p>
-                <a href="/admin">Admin Panel</a> | 
-                Auto-shutdown after idle timeout
-            </p>
+            <a href="/admin">Admin Panel</a>
         </div>
     </div>
 
@@ -392,7 +352,9 @@
                     notebookUrlValue = data.url;
                 }
 
-                handleStatus(data);
+                // Always start polling to wait for Jupyter to be truly ready
+                startPolling();
+                updateLoadingStatus('Preparing Environment', 'Setting up your notebook...');
 
             } catch (error) {
                 showForm();
@@ -422,27 +384,28 @@
 
         function handleStatus(data) {
             const statusMap = {
-                'allocating': { text: 'Allocating Resources', message: 'Setting up your notebook environment...' },
-                'pending': { text: 'Pending', message: 'Waiting for resources to become available...' },
+                'allocating': { text: 'Allocating Resources', message: 'Setting up your environment...' },
+                'pending': { text: 'Pending', message: 'Waiting for resources...' },
                 'loading': { text: 'Loading Image', message: 'Pulling container image...' },
-                'initializing': { text: 'Initializing', message: 'Starting Jupyter server...' },
-                'running': { text: 'Starting Up', message: 'Almost ready...' },
-                'ready': { text: 'Ready!', message: 'Your notebook is ready to use' },
+                'initializing': { text: 'Initializing', message: 'Starting services...' },
+                'running': { text: 'Starting Jupyter', message: 'Almost ready...' },
+                'jupyter_starting': { text: 'Starting Jupyter', message: 'Jupyter is initializing...' },
+                'ready': { text: 'Ready!', message: 'Your notebook is ready' },
             };
 
             const status = statusMap[data.status] || { text: 'Processing...', message: data.message };
+            updateLoadingStatus(status.text, status.message);
 
-            if (data.status === 'ready' || data.status === 'running') {
+            // Only show success when truly ready (Jupyter is responding)
+            if (data.status === 'ready') {
                 stopPolling();
                 showSuccess();
             } else if (data.status === 'failed') {
                 stopPolling();
                 showForm();
                 showError('Failed to create notebook. Please try again.');
-            } else {
-                updateLoadingStatus(status.text, status.message);
-                startPolling();
             }
+            // Keep polling for all other states
         }
 
         function startPolling() {

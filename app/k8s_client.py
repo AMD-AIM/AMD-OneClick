@@ -3,6 +3,7 @@ Kubernetes client for managing notebook instances
 """
 import hashlib
 import logging
+import socket
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -376,7 +377,14 @@ jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-ro
             if pod.status.container_statuses:
                 container_status = pod.status.container_statuses[0]
                 if container_status.ready:
-                    return "ready"
+                    # Container is ready, but we need to verify Jupyter is actually responding
+                    instance = self.get_instance_by_email(email)
+                    if instance and instance.get("node_port"):
+                        if self._check_jupyter_ready(instance["node_port"]):
+                            return "ready"
+                        else:
+                            return "jupyter_starting"
+                    return "running"
                 elif container_status.state.waiting:
                     reason = container_status.state.waiting.reason or "waiting"
                     if reason in ["ContainerCreating", "PodInitializing"]:
@@ -385,6 +393,7 @@ jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-ro
                         return "failed"
                     return "loading"
                 elif container_status.state.running:
+                    # Container is running but not ready yet
                     return "running"
             
             return phase
@@ -392,6 +401,20 @@ jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-ro
             if e.status == 404:
                 return None
             raise
+    
+    def _check_jupyter_ready(self, node_port: int, timeout: float = 2.0) -> bool:
+        """Check if Jupyter is responding on the given port"""
+        try:
+            # Try to connect to the Jupyter server
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            # Connect to any node in the cluster
+            result = sock.connect_ex((settings.SERVICE_HOST, node_port))
+            sock.close()
+            return result == 0
+        except Exception as e:
+            logger.debug(f"Jupyter health check failed: {e}")
+            return False
     
     def check_pod_activity(self, email: str) -> Optional[datetime]:
         """Check last activity of a pod by examining logs"""
