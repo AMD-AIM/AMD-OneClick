@@ -528,16 +528,22 @@
 
         function closeModal() {
             document.getElementById('confirmModal').classList.remove('active');
-            confirmAction = null;
-            confirmData = null;
         }
 
         async function executeConfirm() {
+            // Save action and data before closing modal
+            const action = confirmAction;
+            const data = confirmData;
+            
+            // Reset and close modal
+            confirmAction = null;
+            confirmData = null;
             closeModal();
 
-            if (confirmAction === 'destroy' && confirmData) {
-                await destroyInstance(confirmData);
-            } else if (confirmAction === 'destroyAll') {
+            // Execute the action
+            if (action === 'destroy' && data) {
+                await destroyInstance(data);
+            } else if (action === 'destroyAll') {
                 await destroyAllInstances();
             }
         }
