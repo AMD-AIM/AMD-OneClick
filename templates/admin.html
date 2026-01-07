@@ -320,7 +320,7 @@
     <div class="container">
         <div class="header">
             <div class="logo">
-                <div class="logo-icon"><img src="https://oneclickamd.ai/static/amd.svg" alt="AMD"></div>
+                <div class="logo-icon"><img src="https://amd-ai-academy.com/static/image.png" alt="AMD"></div>
                 <span class="logo-text">Admin Panel</span>
             </div>
             <div class="header-actions">
@@ -562,7 +562,7 @@
 
         async function destroyAllInstances() {
             try {
-                const response = await fetch('/api/admin/instances', {
+                const response = await fetch('/api/admin/instances/all', {
                     method: 'DELETE'
                 });
                 const data = await response.json();
