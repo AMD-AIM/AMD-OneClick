@@ -199,11 +199,17 @@ async def check_status(email: str = Query(..., description="User email")):
 # GitHub Notebook Endpoints
 # =============================================================================
 
-def _generate_github_instance_id(org: str, repo: str, path: str) -> str:
-    """Generate a unique instance ID from GitHub path"""
-    key = f"{org}/{repo}/{path}".lower()
+def _generate_github_instance_id(org: str, repo: str, path: str, user_session: str = "") -> str:
+    """Generate a unique instance ID from GitHub path and user session"""
+    key = f"{org}/{repo}/{path}/{user_session}".lower()
     hash_str = hashlib.md5(key.encode()).hexdigest()[:8]
     return f"gh-{hash_str}"
+
+
+def _generate_user_session() -> str:
+    """Generate a random user session ID"""
+    import uuid
+    return uuid.uuid4().hex[:12]
 
 
 def _parse_github_path(full_path: str) -> dict:
@@ -235,7 +241,8 @@ async def github_notebook(
     request: Request,
     full_path: str,
     response: Response,
-    instance_id: Optional[str] = Cookie(None, alias="amd_oneclick_gh_instance")
+    instance_id: Optional[str] = Cookie(None, alias="amd_oneclick_gh_instance"),
+    user_session: Optional[str] = Cookie(None, alias="amd_oneclick_session")
 ):
     """Handle GitHub notebook request"""
     try:
@@ -243,11 +250,16 @@ async def github_notebook(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-    # Generate instance ID from GitHub path
+    # Generate or use existing user session
+    if not user_session:
+        user_session = _generate_user_session()
+    
+    # Generate instance ID from GitHub path + user session
     generated_instance_id = _generate_github_instance_id(
         github_info["org"], 
         github_info["repo"], 
-        github_info["path"]
+        github_info["path"],
+        user_session
     )
     
     # Check if user already has an instance for this notebook (via cookie)
@@ -260,8 +272,8 @@ async def github_notebook(
                 # Redirect directly to notebook
                 return RedirectResponse(url=existing["url"], status_code=302)
     
-    # Render landing page for status tracking
-    return templates.TemplateResponse(
+    # Set user session cookie if new
+    resp = templates.TemplateResponse(
         "github_landing.html",
         {
             "request": request,
@@ -270,9 +282,20 @@ async def github_notebook(
             "github_path": github_info["path"],
             "github_branch": github_info["branch"],
             "instance_id": generated_instance_id,
-            "full_path": full_path
+            "full_path": full_path,
+            "user_session": user_session
         }
     )
+    
+    # Set session cookie for this user
+    resp.set_cookie(
+        key="amd_oneclick_session",
+        value=user_session,
+        max_age=86400 * 30,  # 30 days
+        httponly=True
+    )
+    
+    return resp
 
 
 @app.post("/api/github/notebook/create")
@@ -282,7 +305,8 @@ async def create_github_notebook(
     org: str = Query(...),
     repo: str = Query(...),
     branch: str = Query(...),
-    path: str = Query(...)
+    path: str = Query(...),
+    user_session: Optional[str] = Cookie(None, alias="amd_oneclick_session")
 ):
     """Create a notebook instance for a GitHub notebook"""
     github_info = {
@@ -293,9 +317,13 @@ async def create_github_notebook(
         "raw_url": f"https://raw.githubusercontent.com/{org}/{repo}/{branch}/{path}"
     }
     
-    instance_id = _generate_github_instance_id(org, repo, path)
+    # Use user session to generate unique instance ID per user
+    if not user_session:
+        user_session = _generate_user_session()
     
-    # Check if instance already exists
+    instance_id = _generate_github_instance_id(org, repo, path, user_session)
+    
+    # Check if instance already exists for THIS user
     existing = k8s_client.get_instance_by_id(instance_id)
     if existing:
         response.set_cookie(
