@@ -357,9 +357,12 @@ async def check_github_status(instance_id: str = Query(...)):
         
         status = k8s_client.get_pod_status("", instance_id=instance_id)
         
+        # Normalize status for frontend - 'ready' means 'running' and ready to use
+        if status == "ready":
+            status = "running"
+        
         status_messages = {
-            "ready": "Your notebook is ready!",
-            "running": "Container is running, starting Jupyter...",
+            "running": "Your notebook is ready!",
             "jupyter_starting": "Jupyter is starting up...",
             "pending": "Waiting for resources...",
             "initializing": "Initializing notebook environment...",
