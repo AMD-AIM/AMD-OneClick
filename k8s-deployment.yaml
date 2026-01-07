@@ -43,7 +43,7 @@ metadata:
   namespace: default
 data:
   K8S_NAMESPACE: "default"
-  DEFAULT_IMAGE: "docker.io/vivienfanghua/amd-jupyter:latest"
+  DEFAULT_IMAGE: "crpi-xhg6joi134vrkpzq.cn-shanghai.personal.cr.aliyuncs.com/vivienfanghua/amd-jupyter:latest"
   CPU_LIMIT: "128"
   MEMORY_LIMIT: "256Gi"
   GPU_LIMIT: "1"
