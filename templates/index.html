@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMD OneClick - Jupyter Notebook</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #ed1c24, #ff6b6b);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .logo-text {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #ed1c24, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #8892b0;
+            font-size: 16px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 32px;
+            backdrop-filter: blur(10px);
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #ccd6f6;
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #ed1c24;
+            box-shadow: 0 0 0 3px rgba(237, 28, 36, 0.2);
+        }
+
+        .form-input::placeholder {
+            color: #5c6370;
+        }
+
+        .form-select option {
+            background: #1a1a2e;
+            color: #fff;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 16px 24px;
+            background: linear-gradient(135deg, #ed1c24, #c41e24);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(237, 28, 36, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-container {
+            display: none;
+            text-align: center;
+            padding: 24px;
+        }
+
+        .status-container.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(237, 28, 36, 0.2);
+            border-top-color: #ed1c24;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status-text {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .status-message {
+            color: #8892b0;
+            font-size: 14px;
+        }
+
+        .success-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #00c853, #00e676);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 32px;
+        }
+
+        .notebook-url {
+            display: block;
+            padding: 16px;
+            background: rgba(0, 200, 83, 0.1);
+            border: 1px solid rgba(0, 200, 83, 0.3);
+            border-radius: 8px;
+            color: #00e676;
+            text-decoration: none;
+            font-family: monospace;
+            font-size: 14px;
+            word-break: break-all;
+            margin: 16px 0;
+            transition: all 0.3s ease;
+        }
+
+        .notebook-url:hover {
+            background: rgba(0, 200, 83, 0.2);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-top: 12px;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow: none;
+        }
+
+        .error-container {
+            background: rgba(255, 82, 82, 0.1);
+            border: 1px solid rgba(255, 82, 82, 0.3);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .error-container.active {
+            display: block;
+        }
+
+        .error-text {
+            color: #ff5252;
+            font-size: 14px;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-top: 32px;
+        }
+
+        .feature {
+            text-align: center;
+            padding: 16px;
+        }
+
+        .feature-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .feature-title {
+            font-size: 12px;
+            color: #8892b0;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #5c6370;
+            font-size: 12px;
+        }
+
+        .footer a {
+            color: #ed1c24;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <div class="logo-icon">🚀</div>
+                <span class="logo-text">AMD OneClick</span>
+            </div>
+            <p class="subtitle">GPU-Powered Jupyter Notebooks in Seconds</p>
+        </div>
+
+        <div class="card">
+            <!-- Request Form -->
+            <div id="requestForm">
+                <div class="form-group">
+                    <label class="form-label" for="email">Email Address</label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        class="form-input" 
+                        placeholder="your@email.com"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="image">Container Image</label>
+                    <select id="image" class="form-select">
+                        {% for img in images %}
+                        <option value="{{ img }}" {% if img == default_image %}selected{% endif %}>
+                            {{ img.split('/')[-1] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button type="button" class="btn" id="requestBtn" onclick="requestNotebook()">
+                    <span>🚀</span>
+                    Request Notebook
+                </button>
+
+                <div class="error-container" id="errorContainer">
+                    <p class="error-text" id="errorText"></p>
+                </div>
+            </div>
+
+            <!-- Loading Status -->
+            <div class="status-container" id="loadingStatus">
+                <div class="spinner"></div>
+                <p class="status-text" id="statusText">Allocating resources...</p>
+                <p class="status-message" id="statusMessage">Please wait while we prepare your notebook</p>
+            </div>
+
+            <!-- Success Status -->
+            <div class="status-container" id="successStatus">
+                <div class="success-icon">✓</div>
+                <p class="status-text">Your Notebook is Ready!</p>
+                <a href="#" class="notebook-url" id="notebookUrl" target="_blank"></a>
+                <button class="btn" onclick="openNotebook()">
+                    Open Notebook
+                </button>
+                <button class="btn btn-secondary" onclick="resetForm()">
+                    Request Another
+                </button>
+            </div>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">⚡</div>
+                <p class="feature-title">AMD GPU Powered</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔒</div>
+                <p class="feature-title">Secure & Isolated</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🎯</div>
+                <p class="feature-title">One-Click Deploy</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>
+                <a href="/admin">Admin Panel</a> | 
+                Auto-shutdown after idle timeout
+            </p>
+        </div>
+    </div>
+
+    <script>
+        let currentEmail = '';
+        let notebookUrlValue = '';
+        let pollInterval = null;
+
+        async function requestNotebook() {
+            const email = document.getElementById('email').value.trim();
+            const image = document.getElementById('image').value;
+
+            if (!email || !validateEmail(email)) {
+                showError('Please enter a valid email address');
+                return;
+            }
+
+            currentEmail = email;
+            hideError();
+            showLoading();
+
+            try {
+                const response = await fetch('/api/notebook/request', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, image }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Request failed');
+                }
+
+                if (data.url) {
+                    notebookUrlValue = data.url;
+                }
+
+                handleStatus(data);
+
+            } catch (error) {
+                showForm();
+                showError(error.message);
+            }
+        }
+
+        async function checkStatus() {
+            try {
+                const response = await fetch(`/api/notebook/status?email=${encodeURIComponent(currentEmail)}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Status check failed');
+                }
+
+                if (data.url) {
+                    notebookUrlValue = data.url;
+                }
+
+                handleStatus(data);
+
+            } catch (error) {
+                console.error('Status check error:', error);
+            }
+        }
+
+        function handleStatus(data) {
+            const statusMap = {
+                'allocating': { text: 'Allocating Resources', message: 'Setting up your notebook environment...' },
+                'pending': { text: 'Pending', message: 'Waiting for resources to become available...' },
+                'loading': { text: 'Loading Image', message: 'Pulling container image...' },
+                'initializing': { text: 'Initializing', message: 'Starting Jupyter server...' },
+                'running': { text: 'Starting Up', message: 'Almost ready...' },
+                'ready': { text: 'Ready!', message: 'Your notebook is ready to use' },
+            };
+
+            const status = statusMap[data.status] || { text: 'Processing...', message: data.message };
+
+            if (data.status === 'ready' || data.status === 'running') {
+                stopPolling();
+                showSuccess();
+            } else if (data.status === 'failed') {
+                stopPolling();
+                showForm();
+                showError('Failed to create notebook. Please try again.');
+            } else {
+                updateLoadingStatus(status.text, status.message);
+                startPolling();
+            }
+        }
+
+        function startPolling() {
+            if (!pollInterval) {
+                pollInterval = setInterval(checkStatus, 3000);
+            }
+        }
+
+        function stopPolling() {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+        }
+
+        function showLoading() {
+            document.getElementById('requestForm').style.display = 'none';
+            document.getElementById('loadingStatus').classList.add('active');
+            document.getElementById('successStatus').classList.remove('active');
+        }
+
+        function updateLoadingStatus(text, message) {
+            document.getElementById('statusText').textContent = text;
+            document.getElementById('statusMessage').textContent = message;
+        }
+
+        function showSuccess() {
+            document.getElementById('requestForm').style.display = 'none';
+            document.getElementById('loadingStatus').classList.remove('active');
+            document.getElementById('successStatus').classList.add('active');
+            document.getElementById('notebookUrl').textContent = notebookUrlValue;
+            document.getElementById('notebookUrl').href = notebookUrlValue;
+        }
+
+        function showForm() {
+            document.getElementById('requestForm').style.display = 'block';
+            document.getElementById('loadingStatus').classList.remove('active');
+            document.getElementById('successStatus').classList.remove('active');
+        }
+
+        function showError(message) {
+            const container = document.getElementById('errorContainer');
+            const text = document.getElementById('errorText');
+            text.textContent = message;
+            container.classList.add('active');
+        }
+
+        function hideError() {
+            document.getElementById('errorContainer').classList.remove('active');
+        }
+
+        function resetForm() {
+            stopPolling();
+            currentEmail = '';
+            notebookUrlValue = '';
+            document.getElementById('email').value = '';
+            showForm();
+            hideError();
+        }
+
+        function openNotebook() {
+            if (notebookUrlValue) {
+                window.open(notebookUrlValue, '_blank');
+            }
+        }
+
+        function validateEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
+        }
+
+        // Handle Enter key
+        document.getElementById('email').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                requestNotebook();
+            }
+        });
+    </script>
+</body>
+</html>

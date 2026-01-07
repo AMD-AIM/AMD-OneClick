@@ -1,0 +1,1 @@
+# AMD OneClick Notebook Manager
