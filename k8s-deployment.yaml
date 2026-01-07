@@ -84,15 +84,9 @@ spec:
       serviceAccountName: amd-oneclick-manager
       containers:
         - name: manager
-          image: python:3.12-slim
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/amd-aim/amd-oneclick:latest
+          imagePullPolicy: Always
           workingDir: /app
-          command:
-            - /bin/bash
-            - -c
-            - |
-              pip install --no-cache-dir -q fastapi uvicorn[standard] kubernetes pydantic[email] apscheduler python-multipart jinja2 &&
-              uvicorn app.main:app --host 0.0.0.0 --port 8000
           ports:
             - containerPort: 8000
           envFrom:
@@ -107,27 +101,18 @@ spec:
             requests:
               cpu: "500m"
               memory: "256Mi"
-          volumeMounts:
-            - name: app-code
-              mountPath: /app
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 60
+            initialDelaySeconds: 120
             periodSeconds: 30
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 10
-      volumes:
-        - name: app-code
-          projected:
-            sources:
-              - configMap:
-                  name: amd-oneclick-app
 
 ---
 apiVersion: v1
@@ -142,4 +127,4 @@ spec:
   ports:
     - port: 80
       targetPort: 8000
-      nodePort: 30080
+      nodePort: 30081
