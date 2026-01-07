@@ -41,12 +41,12 @@
         .logo-icon {
             width: 48px;
             height: 48px;
-            background: #86868b;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
+        }
+
+        .logo-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
 
         .logo-text {
@@ -249,7 +249,7 @@
     <div class="container">
         <div class="header">
             <div class="logo">
-                <div class="logo-icon">⚡</div>
+                <div class="logo-icon"><img src="https://oneclickamd.ai/static/amd.svg" alt="AMD"></div>
                 <span class="logo-text">AMD OneClick</span>
             </div>
             <p class="subtitle">GPU-Powered Jupyter Notebooks</p>
