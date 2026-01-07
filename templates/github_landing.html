@@ -369,13 +369,21 @@
 
             let countdown = 3;
             const countdownEl = document.getElementById('countdown');
+            countdownEl.textContent = countdown;
             
+            // Auto redirect after 3 seconds
+            setTimeout(() => {
+                window.location.href = url;
+            }, 3000);
+            
+            // Update countdown display
             const timer = setInterval(() => {
                 countdown--;
-                countdownEl.textContent = countdown;
-                if (countdown <= 0) {
+                if (countdown > 0) {
+                    countdownEl.textContent = countdown;
+                } else {
                     clearInterval(timer);
-                    window.location.href = url;
+                    countdownEl.textContent = '0';
                 }
             }, 1000);
         }
