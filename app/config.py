@@ -12,13 +12,13 @@ class Settings:
     # Default Notebook Image
     DEFAULT_IMAGE: str = os.getenv(
         "DEFAULT_IMAGE", 
-        "docker.io/rocm/vllm-dev:rocm7.1.1_navi_ubuntu24.04_py3.12_pytorch_2.8_vllm_0.10.2rc1"
+        "crpi-xhg6joi134vrkpzq.cn-shanghai.personal.cr.aliyuncs.com/vivienfanghua/amd-jupyter:latest"
     )
     
-    # Available Images (can be extended)
-    AVAILABLE_IMAGES: list = [
-        "docker.io/rocm/vllm-dev:rocm7.1.1_navi_ubuntu24.04_py3.12_pytorch_2.8_vllm_0.10.2rc1",
-    ]
+    # Available Images - uses DEFAULT_IMAGE as the primary option
+    @property
+    def AVAILABLE_IMAGES(self) -> list:
+        return [self.DEFAULT_IMAGE]
     
     # Notebook Configuration
     NOTEBOOK_TOKEN: str = os.getenv("NOTEBOOK_TOKEN", "amd-oneclick")
