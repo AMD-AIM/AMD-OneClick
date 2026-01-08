@@ -26,11 +26,11 @@ class Settings:
     NOTEBOOK_LABEL_PREFIX: str = "amd-oneclick"
     
     # Resource Limits
-    CPU_LIMIT: str = os.getenv("CPU_LIMIT", "128")
-    MEMORY_LIMIT: str = os.getenv("MEMORY_LIMIT", "256Gi")
+    CPU_LIMIT: str = os.getenv("CPU_LIMIT", "16")
+    MEMORY_LIMIT: str = os.getenv("MEMORY_LIMIT", "64Gi")
     GPU_LIMIT: str = os.getenv("GPU_LIMIT", "1")
-    CPU_REQUEST: str = os.getenv("CPU_REQUEST", "40")
-    MEMORY_REQUEST: str = os.getenv("MEMORY_REQUEST", "48Gi")
+    CPU_REQUEST: str = os.getenv("CPU_REQUEST", "8")
+    MEMORY_REQUEST: str = os.getenv("MEMORY_REQUEST", "32Gi")
     
     # Cleanup Configuration
     IDLE_TIMEOUT_MINUTES: int = int(os.getenv("IDLE_TIMEOUT_MINUTES", "10"))
