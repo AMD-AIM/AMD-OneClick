@@ -108,7 +108,6 @@ jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-ro
                 "annotations": annotations
             },
             "spec": {
-                "nodeName": "wx-ms-w7900d-0004",
                 "dnsPolicy": "None",
                 "dnsConfig": {
                     "nameservers": ["1.1.1.1", "8.8.8.8", "8.8.4.4"],
