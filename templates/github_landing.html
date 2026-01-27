@@ -271,7 +271,7 @@
     </div>
 
     <script>
-        const instanceId = "{{ instance_id }}";
+        let currentInstanceId = "{{ instance_id }}";  // Can be updated after creation
         const githubOrg = "{{ github_org }}";
         const githubRepo = "{{ github_repo }}";
         const githubPath = "{{ github_path }}";
@@ -315,8 +315,14 @@
                     return;
                 }
 
+                // Update instance ID from the response (important for per-user instances)
+                if (data.instance_id) {
+                    currentInstanceId = data.instance_id;
+                    console.log('Instance ID:', currentInstanceId);
+                }
+
                 // If already running, redirect immediately
-                if (data.status === 'running' && data.url) {
+                if ((data.status === 'running' || data.status === 'ready' || data.status === 'exists') && data.url) {
                     showSuccess(data.url);
                     return;
                 }
@@ -336,7 +342,7 @@
 
         async function checkStatus() {
             try {
-                const response = await fetch(`/api/github/notebook/status?instance_id=${encodeURIComponent(instanceId)}`);
+                const response = await fetch(`/api/github/notebook/status?instance_id=${encodeURIComponent(currentInstanceId)}`);
                 const data = await response.json();
 
                 if (!response.ok) {
