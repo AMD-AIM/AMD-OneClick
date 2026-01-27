@@ -396,10 +396,56 @@
     <script>
         let confirmAction = null;
         let confirmData = null;
+        
+        // Get Basic Auth credentials from the browser's auth cache
+        // We make an authenticated request helper that uses the same credentials
+        function getAuthHeaders() {
+            // The browser already has the Basic Auth credentials from the initial page load
+            // We need to extract them or prompt for them
+            const storedAuth = sessionStorage.getItem('adminAuth');
+            if (storedAuth) {
+                return { 'Authorization': 'Basic ' + storedAuth };
+            }
+            return {};
+        }
+        
+        // Prompt for credentials on first API call if needed
+        async function authenticatedFetch(url, options = {}) {
+            let auth = sessionStorage.getItem('adminAuth');
+            
+            // First try without explicit auth (browser might handle it)
+            let response = await fetch(url, {
+                ...options,
+                credentials: 'include'
+            });
+            
+            // If unauthorized, prompt for credentials
+            if (response.status === 401 && !auth) {
+                const username = prompt('Admin username:', 'admin');
+                const password = prompt('Admin password:');
+                if (username && password) {
+                    auth = btoa(username + ':' + password);
+                    sessionStorage.setItem('adminAuth', auth);
+                }
+            }
+            
+            // Retry with explicit auth header
+            if (auth) {
+                response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        ...options.headers,
+                        'Authorization': 'Basic ' + auth
+                    }
+                });
+            }
+            
+            return response;
+        }
 
         async function fetchInstances() {
             try {
-                const response = await fetch('/api/admin/instances');
+                const response = await authenticatedFetch('/api/admin/instances');
                 const data = await response.json();
                 return data;
             } catch (error) {
@@ -544,7 +590,7 @@
 
         async function destroyInstance(instanceId) {
             try {
-                const response = await fetch(`/api/admin/instance/${encodeURIComponent(instanceId)}`, {
+                const response = await authenticatedFetch(`/api/admin/instance/${encodeURIComponent(instanceId)}`, {
                     method: 'DELETE'
                 });
                 const data = await response.json();
@@ -553,7 +599,7 @@
                     showToast('Instance destroyed successfully');
                     refreshList();
                 } else {
-                    showToast('Failed to destroy instance');
+                    showToast('Failed to destroy instance: ' + (data.detail || 'Unknown error'));
                 }
             } catch (error) {
                 showToast('Error: ' + error.message);
@@ -562,7 +608,7 @@
 
         async function destroyAllInstances() {
             try {
-                const response = await fetch('/api/admin/instances', {
+                const response = await authenticatedFetch('/api/admin/instances/all', {
                     method: 'DELETE'
                 });
                 const data = await response.json();

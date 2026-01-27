@@ -1,0 +1,131 @@
+# AMD OneClick PaddleOCR-VL Manager - Kubernetes Deployment
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: amd-ppocr-vl-manager
+  namespace: default
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: amd-ppocr-vl-manager
+  namespace: default
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: amd-ppocr-vl-manager
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: amd-ppocr-vl-manager
+subjects:
+  - kind: ServiceAccount
+    name: amd-ppocr-vl-manager
+    namespace: default
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: amd-ppocr-vl-config
+  namespace: default
+data:
+  K8S_NAMESPACE: "default"
+  DEFAULT_IMAGE: "docker.io/vivienfanghua/vllm_paddle:ppocr-oneclick"
+  CPU_LIMIT: "128"
+  MEMORY_LIMIT: "256Gi"
+  GPU_LIMIT: "1"
+  CPU_REQUEST: "64"
+  MEMORY_REQUEST: "128Gi"
+  IDLE_TIMEOUT_MINUTES: "10"
+  MAX_LIFETIME_HOURS: "6"
+  SERVICE_HOST: "129.212.179.141"
+  NODE_PORT_BASE: "30100"
+  NOTEBOOK_TOKEN: "amd-oneclick"
+  NOTEBOOK_LABEL_PREFIX: "amd-ppocr-vl"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: amd-ppocr-vl-secrets
+  namespace: default
+type: Opaque
+stringData:
+  ADMIN_PASSWORD: "admin123"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: amd-ppocr-vl-manager
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: amd-ppocr-vl-manager
+  template:
+    metadata:
+      labels:
+        app: amd-ppocr-vl-manager
+    spec:
+      serviceAccountName: amd-ppocr-vl-manager
+      containers:
+        - name: manager
+          image: docker.io/vivienfanghua/amd-ppocr-vl-manager:latest
+          imagePullPolicy: Always
+          workingDir: /app
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: amd-ppocr-vl-config
+            - secretRef:
+                name: amd-ppocr-vl-secrets
+          resources:
+            limits:
+              cpu: "2"
+              memory: "1Gi"
+            requests:
+              cpu: "500m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: amd-ppocr-vl-manager
+  namespace: default
+spec:
+  selector:
+    app: amd-ppocr-vl-manager
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 8000
+

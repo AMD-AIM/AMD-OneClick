@@ -11,9 +11,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from pydantic import BaseModel
 import secrets
 
-from .config import settings
+try:
+    from .config_ppocr import settings
+except ImportError:
+    from .config import settings
 from .models import (
     NotebookRequest, 
     NotebookStatus, 
@@ -199,11 +203,25 @@ async def check_status(email: str = Query(..., description="User email")):
 # GitHub Notebook Endpoints
 # =============================================================================
 
-def _generate_github_instance_id(org: str, repo: str, path: str) -> str:
-    """Generate a unique instance ID from GitHub path"""
-    key = f"{org}/{repo}/{path}".lower()
-    hash_str = hashlib.md5(key.encode()).hexdigest()[:8]
-    return f"gh-{hash_str}"
+def _generate_github_instance_id(org: str, repo: str, path: str, unique: bool = False) -> str:
+    """Generate a unique instance ID from GitHub path
+    
+    Args:
+        org: GitHub organization
+        repo: GitHub repository  
+        path: Path to notebook
+        unique: If True, generate a unique ID for each user; if False, shared ID
+    """
+    if unique:
+        # Generate unique ID per user using random component
+        import uuid
+        random_part = uuid.uuid4().hex[:8]
+        return f"gh-{random_part}"
+    else:
+        # Legacy: shared ID based on GitHub path
+        key = f"{org}/{repo}/{path}".lower()
+        hash_str = hashlib.md5(key.encode()).hexdigest()[:8]
+        return f"gh-{hash_str}"
 
 
 def _parse_github_path(full_path: str) -> dict:
@@ -237,30 +255,27 @@ async def github_notebook(
     response: Response,
     instance_id: Optional[str] = Cookie(None, alias="amd_oneclick_gh_instance")
 ):
-    """Handle GitHub notebook request"""
+    """Handle GitHub notebook request
+    
+    Each user gets their own instance (tracked via cookie).
+    """
     try:
         github_info = _parse_github_path(full_path)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-    # Generate instance ID from GitHub path
-    generated_instance_id = _generate_github_instance_id(
-        github_info["org"], 
-        github_info["repo"], 
-        github_info["path"]
-    )
-    
-    # Check if user already has an instance for this notebook (via cookie)
-    if instance_id == generated_instance_id:
-        # Check if instance exists and is ready
-        existing = k8s_client.get_instance_by_id(generated_instance_id)
+    # Check if user already has an instance (from cookie)
+    if instance_id:
+        existing = k8s_client.get_instance_by_id(instance_id)
         if existing:
-            status = k8s_client.get_pod_status("", instance_id=generated_instance_id)
+            status = k8s_client.get_pod_status("", instance_id=instance_id)
             if status == "ready":
                 # Redirect directly to notebook
+                logger.info(f"Redirecting user to existing instance {instance_id}")
                 return RedirectResponse(url=existing["url"], status_code=302)
     
     # Render landing page for status tracking
+    # Pass instance_id from cookie (if any) so frontend can check/reuse
     return templates.TemplateResponse(
         "github_landing.html",
         {
@@ -269,47 +284,55 @@ async def github_notebook(
             "github_repo": github_info["repo"],
             "github_path": github_info["path"],
             "github_branch": github_info["branch"],
-            "instance_id": generated_instance_id,
+            "instance_id": instance_id or "",  # Pass existing cookie ID if any
             "full_path": full_path
         }
     )
+
+
+class GitHubNotebookRequest(BaseModel):
+    org: str
+    repo: str
+    branch: str
+    path: str
 
 
 @app.post("/api/github/notebook/create")
 async def create_github_notebook(
     request: Request,
     response: Response,
-    org: str = Query(...),
-    repo: str = Query(...),
-    branch: str = Query(...),
-    path: str = Query(...)
+    body: GitHubNotebookRequest,
+    existing_instance_id: Optional[str] = Cookie(None, alias="amd_oneclick_gh_instance")
 ):
-    """Create a notebook instance for a GitHub notebook"""
+    """Create a notebook instance for a GitHub notebook
+    
+    Each user gets their own instance (tracked via cookie).
+    """
     github_info = {
-        "org": org,
-        "repo": repo,
-        "branch": branch,
-        "path": path,
-        "raw_url": f"https://raw.githubusercontent.com/{org}/{repo}/{branch}/{path}"
+        "org": body.org,
+        "repo": body.repo,
+        "branch": body.branch,
+        "path": body.path,
+        "raw_url": f"https://raw.githubusercontent.com/{body.org}/{body.repo}/{body.branch}/{body.path}"
     }
+    org = body.org
+    repo = body.repo
+    path = body.path
     
-    instance_id = _generate_github_instance_id(org, repo, path)
+    # Check if user already has an instance (from cookie)
+    if existing_instance_id:
+        existing = k8s_client.get_instance_by_id(existing_instance_id)
+        if existing:
+            logger.info(f"Reusing existing instance {existing_instance_id} for user")
+            return NotebookStatus(
+                status="exists",
+                message="Instance already exists",
+                url=existing.get("url"),
+                instance_id=existing_instance_id
+            )
     
-    # Check if instance already exists
-    existing = k8s_client.get_instance_by_id(instance_id)
-    if existing:
-        response.set_cookie(
-            key="amd_oneclick_gh_instance",
-            value=instance_id,
-            max_age=86400 * 7,  # 7 days
-            httponly=True
-        )
-        return NotebookStatus(
-            status="exists",
-            message="Instance already exists",
-            url=existing.get("url"),
-            instance_id=instance_id
-        )
+    # Create a new unique instance for this user
+    instance_id = _generate_github_instance_id(org, repo, path, unique=True)
     
     try:
         # Use a placeholder email for GitHub notebooks
@@ -322,13 +345,15 @@ async def create_github_notebook(
             custom_instance_id=instance_id
         )
         
-        # Set cookie to remember this instance
+        # Set cookie to remember this instance for this user
         response.set_cookie(
             key="amd_oneclick_gh_instance",
             value=instance_id,
             max_age=86400 * 7,  # 7 days
             httponly=True
         )
+        
+        logger.info(f"Created new instance {instance_id} for user")
         
         return NotebookStatus(
             status="allocating",
@@ -442,7 +467,7 @@ async def destroy_instance(instance_id: str, username: str = Depends(verify_admi
         )
         
     except Exception as e:
-        logger.error(f"Error destroying instance for {email}: {e}")
+        logger.error(f"Error destroying instance {instance_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

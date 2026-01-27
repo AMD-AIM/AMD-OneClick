@@ -286,7 +286,8 @@
             'initializing': { text: 'Initializing...', detail: 'Starting Jupyter server', progress: 50 },
             'downloading': { text: 'Downloading notebook...', detail: `Fetching ${githubPath} from GitHub`, progress: 60 },
             'jupyter_starting': { text: 'Almost ready...', detail: 'Waiting for Jupyter to become available', progress: 80 },
-            'running': { text: 'Ready!', detail: 'Your notebook is ready', progress: 100 }
+            'running': { text: 'Ready!', detail: 'Your notebook is ready', progress: 100 },
+            'ready': { text: 'Ready!', detail: 'Your notebook is ready', progress: 100 }
         };
 
         async function createInstance() {
@@ -345,7 +346,7 @@
 
                 updateStatus(data.status);
 
-                if (data.status === 'running' && data.url) {
+                if ((data.status === 'running' || data.status === 'ready') && data.url) {
                     clearInterval(pollInterval);
                     showSuccess(data.url);
                 } else if (data.status === 'error' || data.status === 'not_found') {

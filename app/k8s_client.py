@@ -10,7 +10,10 @@ from typing import Optional
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
-from .config import settings
+try:
+    from .config_ppocr import settings
+except ImportError:
+    from .config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -69,40 +72,16 @@ class K8sClient:
             # Download the notebook file before starting Jupyter
             notebook_filename = github_info["path"].split("/")[-1]
             startup_script = f"""
-echo "{settings.PYPI_HOST_IP} {settings.PYPI_HOST}" >> /etc/hosts
-mkdir -p ~/.pip
-cat > ~/.pip/pip.conf << EOF
-[global]
-index-url = {settings.PYPI_MIRROR}
-trusted-host = {settings.PYPI_HOST}
-EOF
-pip install --no-cache-dir jupyter ihighlight
-mkdir -p /app/notebooks
-cd /app/notebooks
-python -c "
-import urllib.request
-import ssl
-ssl_ctx = ssl.create_default_context()
-ssl_ctx.check_hostname = False
-ssl_ctx.verify_mode = ssl.CERT_NONE
-url = '{github_info["raw_url"]}'
-urllib.request.urlretrieve(url, '{notebook_filename}')
-print('Downloaded: {notebook_filename}')
-"
-jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-root --ServerApp.token='{settings.NOTEBOOK_TOKEN}' --notebook-dir=/app/notebooks
+export NOTEBOOK_URL='{github_info["raw_url"]}'
+export NOTEBOOK_TOKEN='{settings.NOTEBOOK_TOKEN}'
+export JUPYTER_PORT={settings.NOTEBOOK_PORT}
+exec /opt/PaddleX/oneclick_entrypoint.sh
 """
         else:
             startup_script = f"""
-echo "{settings.PYPI_HOST_IP} {settings.PYPI_HOST}" >> /etc/hosts
-mkdir -p ~/.pip
-cat > ~/.pip/pip.conf << EOF
-[global]
-index-url = {settings.PYPI_MIRROR}
-trusted-host = {settings.PYPI_HOST}
-EOF
-pip install --no-cache-dir jupyter ihighlight
-cd /app
-jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-root --ServerApp.token='{settings.NOTEBOOK_TOKEN}'
+export NOTEBOOK_TOKEN='{settings.NOTEBOOK_TOKEN}'
+export JUPYTER_PORT={settings.NOTEBOOK_PORT}
+exec /opt/PaddleX/oneclick_entrypoint.sh
 """
         
         return {
@@ -126,7 +105,7 @@ jupyter lab --ip=0.0.0.0 --port={settings.NOTEBOOK_PORT} --no-browser --allow-ro
                     {
                         "name": "notebook",
                         "image": image,
-                        "imagePullPolicy": "IfNotPresent",
+                        "imagePullPolicy": "Always",
                         "command": ["/bin/bash", "-c"],
                         "args": [startup_script],
                         "ports": [
