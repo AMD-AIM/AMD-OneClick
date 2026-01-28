@@ -1,0 +1,37 @@
+# Ingress for PaddleOCR-VL OneClick with HTTPS (Let's Encrypt)
+# Domain: ocr.oneclickamd.ai
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ppocr-oneclick-ingress
+  namespace: default
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # WebSocket support for Jupyter
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "86400"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "86400"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    # WebSocket upgrade
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - ocr.oneclickamd.ai
+      secretName: ocr-oneclickamd-tls
+  rules:
+    - host: ocr.oneclickamd.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: amd-ppocr-nginx
+                port:
+                  number: 80
+
