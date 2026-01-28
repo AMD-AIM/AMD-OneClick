@@ -1,0 +1,154 @@
+# Dockerfile.ppocr-oneclick - PaddleOCR-VL OneClick Notebook Image
+# Base: vivienfanghua/vllm_paddle:base
+# Features: vLLM server (background) + Jupyter Lab + Models
+#
+# Build: docker build -f docker/Dockerfile.ppocr-oneclick -t vivienfanghua/vllm_paddle:ppocr-oneclick .
+# Size: ~38GB (base + models + Jupyter)
+#
+# Usage:
+#   - Standalone: docker run -p 8888:8888 -p 8118:8118 --device /dev/kfd --device /dev/dri vivienfanghua/vllm_paddle:ppocr-oneclick
+#   - K8s OneClick: Managed by AMD-OneClick Manager
+
+FROM vivienfanghua/vllm_paddle:base
+
+LABEL maintainer="vivienfanghua"
+LABEL description="PaddleOCR-VL OneClick Notebook with vLLM backend and Jupyter Lab"
+LABEL version="1.0"
+
+# ============================================================
+# Jupyter Lab
+# ============================================================
+RUN pip install --no-cache-dir jupyter jupyterlab
+
+# ============================================================
+# Models (pre-downloaded for faster startup)
+# ============================================================
+# Copy models from build context (build from docker/ directory)
+COPY models/checkpoint-5000 /opt/PaddleX/checkpoint-5000
+COPY models/layout_0116 /opt/PaddleX/layout_0116
+
+# ============================================================
+# Entrypoint Script
+# ============================================================
+# Optimized for fast startup:
+# 1. vLLM starts in background (doesn't block)
+# 2. Jupyter starts immediately (user can access quickly)
+# 3. vLLM loads while user is reading notebook (~1-2 min)
+
+RUN cat > /opt/PaddleX/oneclick_entrypoint.sh << 'ENTRYPOINT_EOF'
+#!/bin/bash
+set -e
+
+echo "========================================"
+echo "  PaddleOCR-VL OneClick Notebook"
+echo "========================================"
+echo "  vLLM Port: ${VLLM_PORT:-8118}"
+echo "  Jupyter Port: ${JUPYTER_PORT:-8888}"
+echo "  GPU Memory: ${GPU_MEMORY_UTILIZATION:-0.85}"
+echo "========================================"
+
+cd /opt/PaddleX
+
+# Create backend config with runtime GPU memory utilization
+echo "gpu_memory_utilization: ${GPU_MEMORY_UTILIZATION:-0.85}" > /opt/PaddleX/backend_config.yaml
+
+# ========================================
+# Step 1: Start vLLM server in background
+# ========================================
+echo "[1/3] Starting vLLM server in background..."
+export PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+
+nohup paddlex_genai_server \
+    --model_name "${MODEL_NAME:-PaddleOCR-VL-1.5-0.9B}" \
+    --model_dir ./checkpoint-5000 \
+    --backend vllm \
+    --host 0.0.0.0 \
+    --port ${VLLM_PORT:-8118} \
+    --backend_config ./backend_config.yaml \
+    > /var/log/vllm_server.log 2>&1 &
+
+VLLM_PID=$!
+echo "vLLM server started with PID: ${VLLM_PID} (loading in background)"
+echo "vLLM will be available at http://localhost:${VLLM_PORT:-8118} once ready"
+
+# ========================================
+# Step 2: Download notebook if URL provided
+# ========================================
+if [ -n "${NOTEBOOK_URL}" ]; then
+    echo ""
+    echo "[2/3] Downloading notebook from GitHub..."
+    mkdir -p /app/notebooks
+    cd /app/notebooks
+    python3 -c "
+import urllib.request
+import ssl
+ssl_ctx = ssl.create_default_context()
+ssl_ctx.check_hostname = False
+ssl_ctx.verify_mode = ssl.CERT_NONE
+url = '${NOTEBOOK_URL}'
+filename = url.split('/')[-1]
+urllib.request.urlretrieve(url, filename)
+print(f'Downloaded: {filename}')
+" || echo "Warning: Failed to download notebook, continuing..."
+    NOTEBOOK_DIR="/app/notebooks"
+else
+    echo ""
+    echo "[2/3] No notebook URL provided, using default directory"
+    NOTEBOOK_DIR="/opt/PaddleX"
+fi
+
+# ========================================
+# Step 3: Start Jupyter Lab (foreground)
+# ========================================
+echo ""
+echo "[3/3] Starting Jupyter Lab..."
+
+# Set base_url for Nginx reverse proxy if INSTANCE_ID is provided
+if [ -n "${INSTANCE_ID}" ]; then
+    BASE_URL="/instance/${INSTANCE_ID}/"
+    echo "========================================"
+    echo "  Jupyter Lab is ready!"
+    echo "  Base URL: ${BASE_URL}"
+    echo "  Token: ${NOTEBOOK_TOKEN:-amd-oneclick}"
+    echo "  Note: vLLM is loading in background (~1-2 min)"
+    echo "========================================"
+    
+    exec jupyter lab \
+        --ip=0.0.0.0 \
+        --port=${JUPYTER_PORT:-8888} \
+        --no-browser \
+        --allow-root \
+        --ServerApp.token="${NOTEBOOK_TOKEN:-amd-oneclick}" \
+        --ServerApp.base_url="${BASE_URL}" \
+        --notebook-dir="${NOTEBOOK_DIR}"
+else
+    echo "========================================"
+    echo "  Jupyter Lab is ready!"
+    echo "  Token: ${NOTEBOOK_TOKEN:-amd-oneclick}"
+    echo "  Note: vLLM is loading in background (~1-2 min)"
+    echo "========================================"
+    
+    exec jupyter lab \
+        --ip=0.0.0.0 \
+        --port=${JUPYTER_PORT:-8888} \
+        --no-browser \
+        --allow-root \
+        --ServerApp.token="${NOTEBOOK_TOKEN:-amd-oneclick}" \
+        --notebook-dir="${NOTEBOOK_DIR}"
+fi
+ENTRYPOINT_EOF
+
+RUN chmod +x /opt/PaddleX/oneclick_entrypoint.sh
+
+# ============================================================
+# Expose Ports
+# ============================================================
+EXPOSE 8118 8888
+
+WORKDIR /opt/PaddleX
+
+# ============================================================
+# Entrypoint
+# ============================================================
+ENTRYPOINT ["/opt/PaddleX/oneclick_entrypoint.sh"]
+

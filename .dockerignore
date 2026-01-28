@@ -1,0 +1,42 @@
+# Docker build ignore file for Manager image
+
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+.eggs
+
+# Virtual environments
+venv
+.venv
+env
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Docker directory (large files, only needed for base/oneclick builds)
+docker/models
+docker/*.whl
+
+# K8s configs
+*.yaml
+
+# Notebooks
+notebooks/
+
+# Documentation
+*.md
+

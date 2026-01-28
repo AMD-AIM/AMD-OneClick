@@ -1,0 +1,36 @@
+# Docker build ignore file
+
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+.eggs
+
+# Virtual environments
+venv
+.venv
+env
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Build artifacts
+build.sh
+.dockerignore
+
+# Documentation
+*.md
+

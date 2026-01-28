@@ -1,0 +1,180 @@
+# Dockerfile.base - PaddleOCR-VL Base Image (Minimal)
+# Base image: rocm/vllm-dev:nightly_main_20260125
+# Features: Paddle + PaddleX + OCR dependencies only
+# No Code Server, No Jupyter, No entrypoint, No models
+#
+# Build: docker build -f docker/Dockerfile.base -t vivienfanghua/vllm_paddle:base .
+# Size: ~26GB (vs ~38GB with models)
+
+FROM rocm/vllm-dev:nightly_main_20260125
+
+LABEL maintainer="vivienfanghua"
+LABEL description="PaddleOCR-VL Base - Paddle + PaddleX + OCR deps for AMD GPUs (ROCm 7.0, gfx942)"
+LABEL version="1.0"
+
+# ============================================================
+# Environment Variables
+# ============================================================
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH=/opt/rocm/bin:$PATH
+ENV LD_LIBRARY_PATH=/opt/rocm/lib:$LD_LIBRARY_PATH
+ENV PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+
+# Default GPU memory utilization (can be overridden at runtime)
+ENV GPU_MEMORY_UTILIZATION=0.85
+
+# ============================================================
+# System Dependencies (minimal)
+# ============================================================
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    patchelf \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# ============================================================
+# PaddlePaddle DCU (ROCm 7.0)
+# ============================================================
+# Copy and install pre-built Paddle wheel
+COPY paddlepaddle_dcu-3.4.0.dev20260123-cp312-cp312-linux_x86_64.whl /tmp/
+RUN pip install --no-cache-dir /tmp/paddlepaddle_dcu-3.4.0.dev20260123-cp312-cp312-linux_x86_64.whl \
+    && rm /tmp/paddlepaddle_dcu-3.4.0.dev20260123-cp312-cp312-linux_x86_64.whl
+
+# ============================================================
+# PaddleX + OCR Dependencies
+# ============================================================
+# Clone PaddleX with ROCm compatibility fixes
+RUN git clone --depth 1 -b feat/concat-markdown-api-rocm \
+    https://github.com/vivienfanghuagood/PaddleX.git /opt/PaddleX \
+    && cd /opt/PaddleX \
+    && pip install --no-cache-dir -e ".[ocr]" \
+    && pip cache purge
+
+# Additional OCR dependencies
+RUN pip install --no-cache-dir \
+    opencv-python \
+    scikit-learn \
+    scipy \
+    shapely \
+    pyclipper \
+    pypdfium2 \
+    beautifulsoup4 \
+    lxml \
+    premailer \
+    openpyxl \
+    ftfy \
+    imagesize \
+    python-bidi
+
+# ============================================================
+# Pipeline Configuration
+# ============================================================
+WORKDIR /opt/PaddleX
+
+# Create pipeline configuration file
+RUN cat > /opt/PaddleX/PaddleOCR-VL-vllm.yaml << 'EOF'
+pipeline_name: PaddleOCR-VL-1.5
+
+batch_size: 64
+
+use_queues: True
+
+use_doc_preprocessor: False
+use_layout_detection: True
+use_chart_recognition: False
+format_block_content: False
+merge_layout_blocks: True
+markdown_ignore_labels:
+  - number
+  - footnote
+  - header
+  - header_image
+  - footer
+  - footer_image
+  - aside_text
+
+SubModules:
+  LayoutDetection:
+    module_name: layout_detection
+    model_name: PP-DocLayoutV3
+    model_dir: ./layout_0116
+    batch_size: 8
+    threshold: 0.3
+    layout_nms: True
+    layout_unclip_ratio: [1.0, 1.0]
+    layout_merge_bboxes_mode:
+      0: "union"
+      1: "union"
+      2: "union"
+      3: "large"
+      4: "union"
+      5: "large"
+      6: "large"
+      7: "union"
+      8: "union"
+      9: "union"
+      10: "union"
+      11: "union"
+      12: "union"
+      13: "union"
+      14: "union"
+      15: "large"
+      16: "union"
+      17: "large"
+      18: "union"
+      19: "union"
+      20: "union"
+      21: "union"
+      22: "union"
+      23: "union"
+      24: "union"
+  VLRecognition:
+    module_name: vl_recognition
+    model_name: PaddleOCR-VL-1.5-0.9B
+    model_dir: ./checkpoint-5000
+    batch_size: 4096
+    genai_config:
+      backend: vllm-server
+      server_url: http://localhost:8118/v1
+
+SubPipelines:
+  DocPreprocessor:
+    pipeline_name: doc_preprocessor
+    batch_size: 8
+    use_doc_orientation_classify: True
+    use_doc_unwarping: True
+    SubModules:
+      DocOrientationClassify:
+        module_name: doc_text_orientation
+        model_name: PP-LCNet_x1_0_doc_ori
+        model_dir: null
+        batch_size: 8
+      DocUnwarping:
+        module_name: image_unwarping
+        model_name: UVDoc
+        model_dir: null
+EOF
+
+# Download test image
+RUN mkdir -p /opt/PaddleX/test \
+    && wget -q -O /opt/PaddleX/test/paddleocr_vl_demo.png \
+    "https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/paddleocr_vl_demo.png"
+
+# ============================================================
+# Verification
+# ============================================================
+RUN python -c "import paddle; print(f'Paddle version: {paddle.__version__}')" \
+    && python -c "import paddle; print(f'ROCm compiled: {paddle.device.is_compiled_with_rocm()}')" \
+    && python -c "import paddlex; print('PaddleX imported successfully')"
+
+# Expose vLLM port (Jupyter port will be added in derived images)
+EXPOSE 8118
+
+WORKDIR /opt/PaddleX
+
+# No ENTRYPOINT - this is a base image
+# Derived images should define their own entrypoint
+CMD ["/bin/bash"]
+
