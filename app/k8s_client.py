@@ -216,14 +216,16 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
     def _build_url(self, instance_id: str, notebook_path: Optional[str] = None) -> str:
         """Build notebook URL via Nginx proxy
         
-        Returns URL in format: http://{SERVICE_HOST}/instance/{instance_id}/lab?token=xxx
+        Returns URL in format: https://{SERVICE_HOST}/instance/{instance_id}/lab?token=xxx
         This URL is proxied by Nginx to the actual notebook service.
         """
-        base_url = f"http://{settings.SERVICE_HOST}/instance/{instance_id}/lab?token={settings.NOTEBOOK_TOKEN}"
+        # Use HTTPS for domain names, HTTP for IP addresses
+        protocol = "https" if not settings.SERVICE_HOST.replace(".", "").isdigit() else "http"
+        base_url = f"{protocol}://{settings.SERVICE_HOST}/instance/{instance_id}/lab?token={settings.NOTEBOOK_TOKEN}"
         if notebook_path:
             # Add notebook path to URL for direct open
             notebook_filename = notebook_path.split("/")[-1]
-            return f"http://{settings.SERVICE_HOST}/instance/{instance_id}/lab/tree/{notebook_filename}?token={settings.NOTEBOOK_TOKEN}"
+            return f"{protocol}://{settings.SERVICE_HOST}/instance/{instance_id}/lab/tree/{notebook_filename}?token={settings.NOTEBOOK_TOKEN}"
         return base_url
     
     def create_instance(self, email: str, image: Optional[str] = None, 
