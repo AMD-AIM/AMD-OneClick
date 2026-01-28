@@ -129,7 +129,8 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
                         "env": [
                             {"name": "SHELL", "value": "/bin/bash"},
                             {"name": "USER_EMAIL", "value": email},
-                            {"name": "GPU_MEMORY_UTILIZATION", "value": "0.85"}
+                            {"name": "GPU_MEMORY_UTILIZATION", "value": "0.85"},
+                            {"name": "INSTANCE_ID", "value": instance_id}
                         ],
                         "volumeMounts": [
                             {"name": "shm", "mountPath": "/dev/shm"}

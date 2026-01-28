@@ -78,8 +78,9 @@ data:
                 # Dynamic upstream: notebook-{instance_id} service in default namespace
                 set $upstream_host notebook-$instance_id.default.svc.cluster.local;
                 
-                # Proxy to the notebook instance service
-                proxy_pass http://$upstream_host:8888/$notebook_path$is_args$args;
+            # Proxy to the notebook instance service
+            # Keep full path because Jupyter uses base_url=/instance/{instance_id}/
+            proxy_pass http://$upstream_host:8888/instance/$instance_id/$notebook_path$is_args$args;
                 
                 # WebSocket support (required for Jupyter kernel communication)
                 proxy_http_version 1.1;
