@@ -51,7 +51,7 @@ data:
   MEMORY_REQUEST: "128Gi"
   IDLE_TIMEOUT_MINUTES: "10"
   MAX_LIFETIME_HOURS: "6"
-  SERVICE_HOST: "129.212.179.141"
+  SERVICE_HOST: "129.212.240.184"
   NODE_PORT_BASE: "30100"
   NOTEBOOK_TOKEN: "amd-oneclick"
   NOTEBOOK_LABEL_PREFIX: "amd-ppocr-vl"
@@ -116,6 +116,7 @@ spec:
             periodSeconds: 10
 
 ---
+# Manager Service - ClusterIP (accessed via Nginx proxy)
 apiVersion: v1
 kind: Service
 metadata:
@@ -124,8 +125,9 @@ metadata:
 spec:
   selector:
     app: amd-ppocr-vl-manager
-  type: LoadBalancer
+  type: ClusterIP
   ports:
-    - port: 80
+    - port: 8000
       targetPort: 8000
+
 

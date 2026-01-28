@@ -1,0 +1,192 @@
+# Nginx Reverse Proxy for AMD OneClick Notebook Manager
+# Provides unified entry point with WebSocket support for Jupyter Lab
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: amd-ppocr-nginx-config
+  namespace: default
+data:
+  nginx.conf: |
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+
+    events {
+        worker_connections 4096;
+        use epoll;
+        multi_accept on;
+    }
+
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for"';
+
+        access_log /var/log/nginx/access.log main;
+
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+
+        # Gzip compression
+        gzip on;
+        gzip_vary on;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types text/plain text/css text/xml application/json application/javascript application/xml;
+
+        # Increase buffer sizes for large requests (Jupyter notebooks)
+        client_max_body_size 100M;
+        proxy_buffer_size 128k;
+        proxy_buffers 4 256k;
+        proxy_busy_buffers_size 256k;
+
+        # Resolver for dynamic upstream resolution
+        # Use kube-dns for K8s service discovery
+        resolver kube-dns.kube-system.svc.cluster.local valid=5s ipv6=off;
+        resolver_timeout 5s;
+
+        # Upstream for Manager service
+        upstream manager {
+            server amd-ppocr-vl-manager:8000;
+            keepalive 32;
+        }
+
+        server {
+            listen 80;
+            server_name _;
+
+            # Health check for nginx itself
+            location /nginx-health {
+                access_log off;
+                return 200 "OK\n";
+                add_header Content-Type text/plain;
+            }
+
+            # Notebook instance proxy - dynamic routing based on instance ID
+            # Pattern: /instance/{instance_id}/{rest_of_path}
+            location ~ ^/instance/([^/]+)/(.*)$ {
+                set $instance_id $1;
+                set $notebook_path $2;
+                
+                # Dynamic upstream: notebook-{instance_id} service in default namespace
+                set $upstream_host notebook-$instance_id.default.svc.cluster.local;
+                
+                # Proxy to the notebook instance service
+                proxy_pass http://$upstream_host:8888/$notebook_path$is_args$args;
+                
+                # WebSocket support (required for Jupyter kernel communication)
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                
+                # Standard proxy headers
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header X-Forwarded-Host $host;
+                
+                # Jupyter specific headers
+                proxy_set_header Origin "";
+                
+                # Longer timeouts for notebook operations
+                proxy_connect_timeout 60s;
+                proxy_send_timeout 300s;
+                proxy_read_timeout 86400s;  # 24 hours for long-running kernels
+                
+                # Buffer settings for large notebook outputs
+                proxy_buffering off;
+            }
+
+            # All other requests go to Manager
+            location / {
+                proxy_pass http://manager;
+                
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                
+                # Keep connection alive
+                proxy_set_header Connection "";
+                
+                proxy_connect_timeout 30s;
+                proxy_send_timeout 60s;
+                proxy_read_timeout 60s;
+            }
+        }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: amd-ppocr-nginx
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: amd-ppocr-nginx
+  template:
+    metadata:
+      labels:
+        app: amd-ppocr-nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+          resources:
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+          livenessProbe:
+            httpGet:
+              path: /nginx-health
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /nginx-health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: amd-ppocr-nginx-config
+
+---
+# LoadBalancer Service - 用户入口
+apiVersion: v1
+kind: Service
+metadata:
+  name: amd-ppocr-nginx
+  namespace: default
+spec:
+  selector:
+    app: amd-ppocr-nginx
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+

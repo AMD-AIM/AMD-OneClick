@@ -149,54 +149,32 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
             }
         }
     
-    def _get_service_manifest(self, email: str, instance_id: str, node_port: int) -> dict:
-        """Generate Service manifest"""
+    def _get_service_manifest(self, email: str, instance_id: str) -> dict:
+        """Generate Service manifest (ClusterIP for Nginx proxy)"""
         labels = self._get_labels(email, instance_id)
         
+        # Service name: notebook-{instance_id} for easy DNS resolution
+        # Nginx will proxy to: notebook-{instance_id}.default.svc.cluster.local
         return {
             "apiVersion": "v1",
             "kind": "Service",
             "metadata": {
-                "name": f"{instance_id}-svc",
+                "name": f"notebook-{instance_id}",
                 "namespace": self.namespace,
                 "labels": labels,
             },
             "spec": {
                 "selector": labels,
-                "type": "NodePort",
+                "type": "ClusterIP",
                 "ports": [
                     {
                         "name": "jupyter",
                         "port": settings.NOTEBOOK_PORT,
-                        "targetPort": settings.NOTEBOOK_PORT,
-                        "nodePort": node_port
+                        "targetPort": settings.NOTEBOOK_PORT
                     }
                 ]
             }
         }
-    
-    def _allocate_node_port(self) -> int:
-        """Allocate an available NodePort"""
-        used_ports = set()
-        
-        try:
-            services = self.core_v1.list_namespaced_service(
-                namespace=self.namespace,
-                label_selector=f"app={settings.NOTEBOOK_LABEL_PREFIX}"
-            )
-            for svc in services.items:
-                for port in svc.spec.ports or []:
-                    if port.node_port:
-                        used_ports.add(port.node_port)
-        except ApiException as e:
-            logger.warning(f"Error listing services: {e}")
-        
-        # Find available port starting from base
-        port = settings.NODE_PORT_BASE
-        while port in used_ports and port < 32767:
-            port += 1
-        
-        return port
     
     def get_instance_by_email(self, email: str) -> Optional[dict]:
         """Get existing notebook instance for an email"""
@@ -208,39 +186,43 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
                 namespace=self.namespace
             )
             
-            # Get associated service
+            # Check if service exists
+            service_exists = False
             try:
-                svc = self.core_v1.read_namespaced_service(
-                    name=f"{instance_id}-svc",
+                self.core_v1.read_namespaced_service(
+                    name=f"notebook-{instance_id}",
                     namespace=self.namespace
                 )
-                node_port = svc.spec.ports[0].node_port if svc.spec.ports else None
+                service_exists = True
             except ApiException:
-                node_port = None
+                pass
             
             return {
                 "id": instance_id,
                 "email": email,
                 "pod_name": pod.metadata.name,
-                "service_name": f"{instance_id}-svc",
+                "service_name": f"notebook-{instance_id}",
                 "image": pod.spec.containers[0].image,
                 "status": pod.status.phase.lower(),
                 "created_at": pod.metadata.creation_timestamp,
-                "node_port": node_port,
-                "url": self._build_url(node_port) if node_port else None
+                "url": self._build_url(instance_id) if service_exists else None
             }
         except ApiException as e:
             if e.status == 404:
                 return None
             raise
     
-    def _build_url(self, node_port: int, notebook_path: Optional[str] = None) -> str:
-        """Build notebook URL"""
-        base_url = f"http://{settings.SERVICE_HOST}:{node_port}/lab?token={settings.NOTEBOOK_TOKEN}"
+    def _build_url(self, instance_id: str, notebook_path: Optional[str] = None) -> str:
+        """Build notebook URL via Nginx proxy
+        
+        Returns URL in format: http://{SERVICE_HOST}/instance/{instance_id}/lab?token=xxx
+        This URL is proxied by Nginx to the actual notebook service.
+        """
+        base_url = f"http://{settings.SERVICE_HOST}/instance/{instance_id}/lab?token={settings.NOTEBOOK_TOKEN}"
         if notebook_path:
             # Add notebook path to URL for direct open
             notebook_filename = notebook_path.split("/")[-1]
-            return f"http://{settings.SERVICE_HOST}:{node_port}/lab/tree/{notebook_filename}?token={settings.NOTEBOOK_TOKEN}"
+            return f"http://{settings.SERVICE_HOST}/instance/{instance_id}/lab/tree/{notebook_filename}?token={settings.NOTEBOOK_TOKEN}"
         return base_url
     
     def create_instance(self, email: str, image: Optional[str] = None, 
@@ -255,9 +237,6 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
         if existing:
             return existing
         
-        # Allocate NodePort
-        node_port = self._allocate_node_port()
-        
         # Create Pod
         pod_manifest = self._get_pod_manifest(email, instance_id, image, github_info)
         try:
@@ -270,14 +249,14 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
             logger.error(f"Failed to create pod: {e}")
             raise
         
-        # Create Service
-        svc_manifest = self._get_service_manifest(email, instance_id, node_port)
+        # Create ClusterIP Service (for Nginx proxy)
+        svc_manifest = self._get_service_manifest(email, instance_id)
         try:
             self.core_v1.create_namespaced_service(
                 namespace=self.namespace,
                 body=svc_manifest
             )
-            logger.info(f"Created service {instance_id}-svc with NodePort {node_port}")
+            logger.info(f"Created service notebook-{instance_id} (ClusterIP)")
         except ApiException as e:
             logger.error(f"Failed to create service: {e}")
             # Cleanup pod if service creation fails
@@ -290,12 +269,11 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
             "id": instance_id,
             "email": email,
             "pod_name": instance_id,
-            "service_name": f"{instance_id}-svc",
+            "service_name": f"notebook-{instance_id}",
             "image": image,
             "status": "pending",
             "created_at": datetime.now(timezone.utc),
-            "node_port": node_port,
-            "url": self._build_url(node_port, notebook_path),
+            "url": self._build_url(instance_id, notebook_path),
             "github_info": github_info
         }
     
@@ -307,15 +285,16 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
                 namespace=self.namespace
             )
             
-            # Get associated service
+            # Check if service exists
+            service_exists = False
             try:
-                svc = self.core_v1.read_namespaced_service(
-                    name=f"{instance_id}-svc",
+                self.core_v1.read_namespaced_service(
+                    name=f"notebook-{instance_id}",
                     namespace=self.namespace
                 )
-                node_port = svc.spec.ports[0].node_port if svc.spec.ports else None
+                service_exists = True
             except ApiException:
-                node_port = None
+                pass
             
             email = pod.metadata.annotations.get("amd-oneclick/email", "unknown")
             github_path = pod.metadata.annotations.get("amd-oneclick/github-path")
@@ -324,12 +303,11 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
                 "id": instance_id,
                 "email": email,
                 "pod_name": pod.metadata.name,
-                "service_name": f"{instance_id}-svc",
+                "service_name": f"notebook-{instance_id}",
                 "image": pod.spec.containers[0].image,
                 "status": pod.status.phase.lower(),
                 "created_at": pod.metadata.creation_timestamp,
-                "node_port": node_port,
-                "url": self._build_url(node_port, github_path) if node_port else None,
+                "url": self._build_url(instance_id, github_path) if service_exists else None,
                 "github_org": pod.metadata.annotations.get("amd-oneclick/github-org"),
                 "github_repo": pod.metadata.annotations.get("amd-oneclick/github-repo"),
                 "github_path": github_path,
@@ -343,17 +321,28 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
         """Delete a notebook instance by instance ID"""
         deleted = False
         
-        # Delete Service
+        # Delete Service (new naming: notebook-{instance_id})
+        try:
+            self.core_v1.delete_namespaced_service(
+                name=f"notebook-{instance_id}",
+                namespace=self.namespace
+            )
+            logger.info(f"Deleted service notebook-{instance_id}")
+            deleted = True
+        except ApiException as e:
+            if e.status != 404:
+                logger.warning(f"Error deleting service: {e}")
+        
+        # Also try to delete old-style service name for backwards compatibility
         try:
             self.core_v1.delete_namespaced_service(
                 name=f"{instance_id}-svc",
                 namespace=self.namespace
             )
-            logger.info(f"Deleted service {instance_id}-svc")
+            logger.info(f"Deleted legacy service {instance_id}-svc")
             deleted = True
         except ApiException as e:
-            if e.status != 404:
-                logger.warning(f"Error deleting service: {e}")
+            pass  # Ignore if not found
         
         # Delete Pod
         try:
@@ -394,14 +383,14 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
                 github_repo = pod.metadata.annotations.get("amd-oneclick/github-repo")
                 github_path = pod.metadata.annotations.get("amd-oneclick/github-path")
                 
-                # Get NodePort from service
-                node_port = None
+                # Check if service exists
+                service_exists = False
                 try:
-                    svc = self.core_v1.read_namespaced_service(
-                        name=f"{instance_id}-svc",
+                    self.core_v1.read_namespaced_service(
+                        name=f"notebook-{instance_id}",
                         namespace=self.namespace
                     )
-                    node_port = svc.spec.ports[0].node_port if svc.spec.ports else None
+                    service_exists = True
                 except ApiException:
                     pass
                 
@@ -415,12 +404,11 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
                     "id": instance_id,
                     "email": email,
                     "pod_name": pod.metadata.name,
-                    "service_name": f"{instance_id}-svc",
+                    "service_name": f"notebook-{instance_id}",
                     "image": pod.spec.containers[0].image if pod.spec.containers else "unknown",
                     "status": pod.status.phase.lower() if pod.status.phase else "unknown",
                     "created_at": created_at.isoformat() if created_at else None,
-                    "node_port": node_port,
-                    "url": self._build_url(node_port, github_path) if node_port else None,
+                    "url": self._build_url(instance_id, github_path) if service_exists else None,
                     "uptime_minutes": uptime_minutes,
                     "github_org": github_org,
                     "github_repo": github_repo,
@@ -460,13 +448,10 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
                 container_status = pod.status.container_statuses[0]
                 if container_status.ready:
                     # Container is ready, but we need to verify Jupyter is actually responding
-                    instance = self.get_instance_by_id(instance_id)
-                    if instance and instance.get("node_port"):
-                        if self._check_jupyter_ready(instance["node_port"]):
-                            return "ready"
-                        else:
-                            return "jupyter_starting"
-                    return "running"
+                    if self._check_jupyter_ready(instance_id):
+                        return "ready"
+                    else:
+                        return "jupyter_starting"
                 elif container_status.state.waiting:
                     reason = container_status.state.waiting.reason or "waiting"
                     if reason in ["ContainerCreating", "PodInitializing"]:
@@ -484,18 +469,19 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
                 return None
             raise
     
-    def _check_jupyter_ready(self, node_port: int, timeout: float = 2.0) -> bool:
-        """Check if Jupyter is responding on the given port"""
+    def _check_jupyter_ready(self, instance_id: str, timeout: float = 2.0) -> bool:
+        """Check if Jupyter is responding via ClusterIP service"""
         try:
-            # Try to connect to the Jupyter server
+            # Try to connect to the Jupyter server via ClusterIP service
+            # Service DNS: notebook-{instance_id}.default.svc.cluster.local
+            service_host = f"notebook-{instance_id}.{self.namespace}.svc.cluster.local"
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(timeout)
-            # Connect to any node in the cluster
-            result = sock.connect_ex((settings.SERVICE_HOST, node_port))
+            result = sock.connect_ex((service_host, settings.NOTEBOOK_PORT))
             sock.close()
             return result == 0
         except Exception as e:
-            logger.debug(f"Jupyter health check failed: {e}")
+            logger.debug(f"Jupyter health check failed for {instance_id}: {e}")
             return False
     
     def check_pod_activity(self, email: str) -> Optional[datetime]:
