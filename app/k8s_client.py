@@ -428,7 +428,8 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
         deleted_count = 0
         
         for instance in instances:
-            if self.delete_instance(instance["email"]):
+            # Use instance ID directly, not email (GitHub instances have fake emails)
+            if self.delete_instance_by_id(instance["id"]):
                 deleted_count += 1
         
         return deleted_count
@@ -542,12 +543,14 @@ exec /opt/PaddleX/oneclick_entrypoint.sh
                         reason = f"idle for {int(idle_minutes)} minutes"
             
             if should_delete:
-                if self.delete_instance(instance["email"]):
+                # Use instance ID directly, not email (GitHub instances have fake emails)
+                if self.delete_instance_by_id(instance["id"]):
                     cleaned.append({
+                        "id": instance["id"],
                         "email": instance["email"],
                         "reason": reason
                     })
-                    logger.info(f"Cleaned up instance for {instance['email']}: {reason}")
+                    logger.info(f"Cleaned up instance {instance['id']}: {reason}")
         
         return cleaned
 
