@@ -774,8 +774,9 @@ fi
 if [ -f requirements.txt ]; then
     echo "Installing requirements..."
     # First, try to install common Space dependencies that might be missing
+    # Use gradio<5.0 for compatibility with cache_examples="lazy"
     echo "Installing common Space dependencies..."
-    pip install gradio spaces --quiet 2>/dev/null || true
+    pip install "gradio>=4.0,<5.0" spaces --quiet 2>/dev/null || true
     
     # Install each package separately to continue even if some fail
     # Skip packages with platform-specific wheels that won't work on ROCm
@@ -795,8 +796,9 @@ if [ -f requirements.txt ]; then
     echo "Requirements installation completed"
 else
     # No requirements.txt, but install common Space dependencies
+    # Use gradio<5.0 for compatibility with cache_examples="lazy"
     echo "Installing common Space dependencies..."
-    pip install gradio spaces --quiet 2>/dev/null || true
+    pip install "gradio>=4.0,<5.0" spaces --quiet 2>/dev/null || true
 fi
 
 # Run the start command
