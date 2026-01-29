@@ -59,11 +59,15 @@ class K8sClient:
         """Generate a unique Space ID"""
         key = f"{src_meta.src}:{src_meta.inner_uid or src_meta.outer_email}:{repo_url}"
         hash_str = hashlib.md5(key.encode()).hexdigest()[:8]
-        return f"sp-{hash_str}"
+        return f"aideploy-space-{hash_str}"
     
     def _generate_unique_id(self, prefix: str = "inst") -> str:
         """Generate a unique random ID"""
         return f"{prefix}-{uuid.uuid4().hex[:8]}"
+    
+    def _generate_notebook_id(self) -> str:
+        """Generate a unique Notebook ID"""
+        return f"aideploy-nb-{uuid.uuid4().hex[:8]}"
     
     # =========================================================================
     # Label Generation Methods
@@ -740,9 +744,18 @@ echo "Branch: ${REPO_BRANCH}"
 mkdir -p /workspace
 cd /workspace
 
+# Remove existing app directory if it exists
+if [ -d "app" ]; then
+    echo "Removing existing app directory..."
+    rm -rf app
+fi
+
 # Clone the repository
 echo "Cloning repository..."
-git clone --depth 1 -b "${REPO_BRANCH}" "${REPO_URL}" app
+git clone --depth 1 -b "${REPO_BRANCH}" "${REPO_URL}" app || {
+    echo "Failed to clone with branch, trying default branch..."
+    git clone --depth 1 "${REPO_URL}" app
+}
 cd app
 
 # Download and setup conda environment if specified
@@ -1161,6 +1174,12 @@ echo "=== AMD OneClick Notebook Startup ==="
 echo "Instance ID: ${INSTANCE_ID}"
 echo "Notebook URL: ${NOTEBOOK_URL}"
 
+# Install Jupyter if not already installed
+if ! command -v jupyter &> /dev/null; then
+    echo "Installing JupyterLab..."
+    pip install jupyterlab -q
+fi
+
 # Create notebook directory
 mkdir -p /workspace/notebooks
 cd /workspace/notebooks
@@ -1168,7 +1187,8 @@ cd /workspace/notebooks
 # Download notebook if URL provided
 if [ -n "${NOTEBOOK_URL}" ]; then
     echo "Downloading notebook..."
-    wget -q -O notebook.ipynb "${NOTEBOOK_URL}" || echo "Warning: Failed to download notebook"
+    NOTEBOOK_FILENAME=$(basename "${NOTEBOOK_URL}")
+    wget -q -O "${NOTEBOOK_FILENAME}" "${NOTEBOOK_URL}" || echo "Warning: Failed to download notebook"
 fi
 
 # Download and setup conda environment if specified
@@ -1252,7 +1272,7 @@ exec jupyter lab \
     def create_generic_notebook(self, request: GenericNotebookRequest) -> dict:
         """Create a new generic Notebook instance"""
         # Generate unique instance ID
-        instance_id = self._generate_unique_id("gnb")
+        instance_id = self._generate_notebook_id()
         
         # Get resource spec from preset
         resource_spec = self._get_resource_spec_from_preset(request.resource_preset)
