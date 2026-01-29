@@ -770,13 +770,23 @@ if [ -n "${CONDA_ENV_URL}" ]; then
     fi
 fi
 
+# Try to read Gradio version from README.md (HuggingFace Spaces format)
+GRADIO_VERSION=""
+if [ -f README.md ]; then
+    GRADIO_VERSION=$(grep -oP 'sdk_version:\s*\K[0-9.]+' README.md || true)
+    echo "Found SDK version in README: ${GRADIO_VERSION:-not specified}"
+fi
+
 # Install requirements if exists
 if [ -f requirements.txt ]; then
     echo "Installing requirements..."
-    # First, try to install common Space dependencies that might be missing
-    # Use gradio<5.0 for compatibility with cache_examples="lazy"
-    echo "Installing common Space dependencies..."
-    pip install "gradio>=4.0,<5.0" spaces --quiet 2>/dev/null || true
+    # First, install Gradio with the version from README or default
+    echo "Installing Gradio..."
+    if [ -n "${GRADIO_VERSION}" ]; then
+        pip install "gradio==${GRADIO_VERSION}" spaces --quiet 2>/dev/null || pip install gradio spaces --quiet 2>/dev/null || true
+    else
+        pip install gradio spaces --quiet 2>/dev/null || true
+    fi
     
     # Install each package separately to continue even if some fail
     # Skip packages with platform-specific wheels that won't work on ROCm
@@ -796,9 +806,12 @@ if [ -f requirements.txt ]; then
     echo "Requirements installation completed"
 else
     # No requirements.txt, but install common Space dependencies
-    # Use gradio<5.0 for compatibility with cache_examples="lazy"
-    echo "Installing common Space dependencies..."
-    pip install "gradio>=4.0,<5.0" spaces --quiet 2>/dev/null || true
+    echo "Installing Gradio..."
+    if [ -n "${GRADIO_VERSION}" ]; then
+        pip install "gradio==${GRADIO_VERSION}" spaces --quiet 2>/dev/null || pip install gradio spaces --quiet 2>/dev/null || true
+    else
+        pip install gradio spaces --quiet 2>/dev/null || true
+    fi
 fi
 
 # Run the start command
