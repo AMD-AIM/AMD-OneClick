@@ -20,7 +20,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 40px 20px;
         }
@@ -101,10 +101,73 @@
             background: #424245;
         }
 
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 24px;
+            background: #e8e8ed;
+            border-radius: 10px;
+            padding: 4px;
+            width: fit-content;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            color: #86868b;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: #ffffff;
+            color: #1d1d1f;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .tab:hover:not(.active) {
+            color: #1d1d1f;
+        }
+
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-label {
+            font-size: 13px;
+            color: #86868b;
+            font-weight: 500;
+        }
+
+        .filter-select {
+            padding: 8px 12px;
+            border: 1px solid #d2d2d7;
+            border-radius: 6px;
+            font-size: 13px;
+            background: #fff;
+            min-width: 140px;
+        }
+
         .stats {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
             margin-bottom: 32px;
         }
 
@@ -112,18 +175,18 @@
             background: #ffffff;
             border: 1px solid #d2d2d7;
             border-radius: 12px;
-            padding: 24px;
+            padding: 20px;
         }
 
         .stat-value {
-            font-size: 36px;
+            font-size: 32px;
             font-weight: 700;
             color: #1d1d1f;
         }
 
         .stat-label {
             color: #86868b;
-            font-size: 14px;
+            font-size: 13px;
             margin-top: 4px;
         }
 
@@ -140,7 +203,7 @@
         }
 
         th, td {
-            padding: 16px;
+            padding: 14px 16px;
             text-align: left;
             border-bottom: 1px solid #e8e8ed;
         }
@@ -148,7 +211,7 @@
         th {
             background: #f5f5f7;
             font-weight: 600;
-            font-size: 12px;
+            font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             color: #86868b;
@@ -164,19 +227,19 @@
 
         .status-badge {
             display: inline-block;
-            padding: 6px 12px;
+            padding: 5px 10px;
             border-radius: 20px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             text-transform: capitalize;
         }
 
-        .status-running {
+        .status-running, .status-ready {
             background: #e8ebe8;
             color: #4a6b4a;
         }
 
-        .status-pending {
+        .status-pending, .status-initializing, .status-loading {
             background: #ebe8e0;
             color: #6b5d4a;
         }
@@ -186,14 +249,38 @@
             color: #6b4a4a;
         }
 
-        .status-ready {
-            background: #e8ebe8;
+        .type-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .type-notebook {
+            background: #e8e8f0;
+            color: #4a4a6b;
+        }
+
+        .type-space {
+            background: #e8f0e8;
             color: #4a6b4a;
         }
 
+        .gpu-badge {
+            display: inline-block;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 500;
+            background: #f0e8e8;
+            color: #6b4a4a;
+        }
+
         .btn-sm {
-            padding: 8px 16px;
-            font-size: 12px;
+            padding: 6px 12px;
+            font-size: 11px;
         }
 
         .btn-sm.btn-danger {
@@ -263,7 +350,7 @@
             color: #1d1d1f;
             text-decoration: none;
             font-family: 'SF Mono', Monaco, monospace;
-            font-size: 12px;
+            font-size: 11px;
         }
 
         .url-link:hover {
@@ -314,6 +401,31 @@
                 opacity: 1;
             }
         }
+
+        .source-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .source-main {
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        .source-sub {
+            font-size: 11px;
+            color: #86868b;
+            font-family: monospace;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .hidden {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
@@ -324,8 +436,11 @@
                 <span class="logo-text">Admin Panel</span>
             </div>
             <div class="header-actions">
-                <button class="btn btn-secondary" onclick="refreshList()">
+                <button class="btn btn-secondary" onclick="refreshAll()">
                     ↻ Refresh
+                </button>
+                <button class="btn btn-secondary" onclick="triggerCleanup()">
+                    🧹 Cleanup Idle
                 </button>
                 <button class="btn btn-danger" onclick="confirmDestroyAll()">
                     ⊗ Destroy All
@@ -333,10 +448,60 @@
             </div>
         </div>
 
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" data-tab="all" onclick="switchTab('all')">All</button>
+            <button class="tab" data-tab="notebooks" onclick="switchTab('notebooks')">Notebooks</button>
+            <button class="tab" data-tab="spaces" onclick="switchTab('spaces')">Spaces</button>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters">
+            <div class="filter-group">
+                <span class="filter-label">Source:</span>
+                <select class="filter-select" id="filterSrc" onchange="applyFilters()">
+                    <option value="">All Sources</option>
+                    <option value="github">GitHub</option>
+                    <option value="modelscope">ModelScope</option>
+                    <option value="aistudio">AIStudio</option>
+                    <option value="direct">Direct</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <span class="filter-label">GPU:</span>
+                <select class="filter-select" id="filterGpu" onchange="applyFilters()">
+                    <option value="">All GPUs</option>
+                    <option value="mi300x">MI300X</option>
+                    <option value="mi355x">MI355X</option>
+                    <option value="r7900">R7900</option>
+                    <option value="cpu">CPU Only</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <span class="filter-label">Status:</span>
+                <select class="filter-select" id="filterStatus" onchange="applyFilters()">
+                    <option value="">All Status</option>
+                    <option value="running">Running</option>
+                    <option value="ready">Ready</option>
+                    <option value="pending">Pending</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Stats -->
         <div class="stats">
             <div class="stat-card">
                 <div class="stat-value" id="totalInstances">0</div>
                 <div class="stat-label">Total Instances</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="notebookCount">0</div>
+                <div class="stat-label">Notebooks</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="spaceCount">0</div>
+                <div class="stat-label">Spaces</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="runningInstances">0</div>
@@ -348,12 +513,15 @@
             </div>
         </div>
 
+        <!-- Table -->
         <div class="table-container">
             <table>
                 <thead>
                     <tr>
+                        <th>Type</th>
                         <th>Source</th>
                         <th>Status</th>
+                        <th>GPU</th>
                         <th>URL</th>
                         <th>Created</th>
                         <th>Uptime</th>
@@ -362,7 +530,7 @@
                 </thead>
                 <tbody id="instancesTable">
                     <tr>
-                        <td colspan="6">
+                        <td colspan="8">
                             <div class="empty-state">
                                 <div class="empty-state-icon">📭</div>
                                 <p>No instances found</p>
@@ -396,12 +564,11 @@
     <script>
         let confirmAction = null;
         let confirmData = null;
+        let currentTab = 'all';
+        let allData = { notebooks: [], spaces: [] };
         
-        // Get Basic Auth credentials from the browser's auth cache
-        // We make an authenticated request helper that uses the same credentials
+        // Get Basic Auth credentials
         function getAuthHeaders() {
-            // The browser already has the Basic Auth credentials from the initial page load
-            // We need to extract them or prompt for them
             const storedAuth = sessionStorage.getItem('adminAuth');
             if (storedAuth) {
                 return { 'Authorization': 'Basic ' + storedAuth };
@@ -409,17 +576,15 @@
             return {};
         }
         
-        // Prompt for credentials on first API call if needed
+        // Authenticated fetch helper
         async function authenticatedFetch(url, options = {}) {
             let auth = sessionStorage.getItem('adminAuth');
             
-            // First try without explicit auth (browser might handle it)
             let response = await fetch(url, {
                 ...options,
                 credentials: 'include'
             });
             
-            // If unauthorized, prompt for credentials
             if (response.status === 401 && !auth) {
                 const username = prompt('Admin username:', 'admin');
                 const password = prompt('Admin password:');
@@ -429,7 +594,6 @@
                 }
             }
             
-            // Retry with explicit auth header
             if (auth) {
                 response = await fetch(url, {
                     ...options,
@@ -443,44 +607,116 @@
             return response;
         }
 
-        async function fetchInstances() {
+        // Fetch all data
+        async function fetchAllData() {
             try {
-                const response = await authenticatedFetch('/api/admin/instances');
+                const response = await authenticatedFetch('/api/admin/all');
                 const data = await response.json();
+                allData = data;
                 return data;
             } catch (error) {
-                console.error('Error fetching instances:', error);
-                return { instances: [], total_count: 0 };
+                console.error('Error fetching data:', error);
+                // Fallback to separate endpoints
+                try {
+                    const [notebooksRes, spacesRes] = await Promise.all([
+                        authenticatedFetch('/api/admin/instances'),
+                        authenticatedFetch('/api/admin/spaces')
+                    ]);
+                    const notebooks = await notebooksRes.json();
+                    const spaces = await spacesRes.json();
+                    allData = {
+                        notebooks: notebooks.instances || [],
+                        spaces: spaces.spaces || [],
+                        total_notebooks: notebooks.total_count || 0,
+                        total_spaces: spaces.total_count || 0
+                    };
+                    return allData;
+                } catch (e) {
+                    console.error('Fallback also failed:', e);
+                    return { notebooks: [], spaces: [], total_notebooks: 0, total_spaces: 0 };
+                }
             }
         }
 
-        async function refreshList() {
-            const data = await fetchInstances();
-            updateStats(data);
-            renderTable(data.instances);
+        // Switch tab
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.tab[data-tab="${tab}"]`).classList.add('active');
+            applyFilters();
         }
 
-        function updateStats(data) {
-            document.getElementById('totalInstances').textContent = data.total_count || 0;
+        // Apply filters and render
+        function applyFilters() {
+            const srcFilter = document.getElementById('filterSrc').value;
+            const gpuFilter = document.getElementById('filterGpu').value;
+            const statusFilter = document.getElementById('filterStatus').value;
+
+            let items = [];
+
+            // Combine based on tab
+            if (currentTab === 'all' || currentTab === 'notebooks') {
+                const notebooks = (allData.notebooks || []).map(n => ({
+                    ...n,
+                    type: 'notebook',
+                    displayName: n.github_repo || n.email || n.id
+                }));
+                items = items.concat(notebooks);
+            }
             
-            const running = data.instances.filter(i => 
-                i.status === 'running' || i.status === 'ready'
-            ).length;
-            const pending = data.instances.filter(i => 
-                i.status === 'pending' || i.status === 'initializing' || i.status === 'loading'
-            ).length;
-            
-            document.getElementById('runningInstances').textContent = running;
-            document.getElementById('pendingInstances').textContent = pending;
+            if (currentTab === 'all' || currentTab === 'spaces') {
+                const spaces = (allData.spaces || []).map(s => ({
+                    ...s,
+                    type: 'space',
+                    displayName: s.repo_url ? s.repo_url.split('/').pop() : s.id
+                }));
+                items = items.concat(spaces);
+            }
+
+            // Apply filters
+            if (srcFilter) {
+                items = items.filter(i => (i.src || '').toLowerCase() === srcFilter);
+            }
+            if (gpuFilter) {
+                items = items.filter(i => (i.gpu_type || '').toLowerCase() === gpuFilter);
+            }
+            if (statusFilter) {
+                items = items.filter(i => i.status === statusFilter);
+            }
+
+            updateStats(items);
+            renderTable(items);
         }
 
-        function renderTable(instances) {
+        // Refresh all data
+        async function refreshAll() {
+            await fetchAllData();
+            applyFilters();
+            showToast('Data refreshed');
+        }
+
+        // Update stats
+        function updateStats(items) {
+            const notebooks = items.filter(i => i.type === 'notebook');
+            const spaces = items.filter(i => i.type === 'space');
+            const running = items.filter(i => i.status === 'running' || i.status === 'ready');
+            const pending = items.filter(i => ['pending', 'initializing', 'loading'].includes(i.status));
+
+            document.getElementById('totalInstances').textContent = items.length;
+            document.getElementById('notebookCount').textContent = notebooks.length;
+            document.getElementById('spaceCount').textContent = spaces.length;
+            document.getElementById('runningInstances').textContent = running.length;
+            document.getElementById('pendingInstances').textContent = pending.length;
+        }
+
+        // Render table
+        function renderTable(items) {
             const tbody = document.getElementById('instancesTable');
             
-            if (!instances || instances.length === 0) {
+            if (!items || items.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="6">
+                        <td colspan="8">
                             <div class="empty-state">
                                 <div class="empty-state-icon">📭</div>
                                 <p>No instances found</p>
@@ -491,49 +727,64 @@
                 return;
             }
 
-            tbody.innerHTML = instances.map(instance => {
-                // Determine source display - GitHub or Email
+            tbody.innerHTML = items.map(item => {
+                // Type badge
+                const typeBadge = `<span class="type-badge type-${item.type}">${item.type}</span>`;
+                
+                // Source display
                 let sourceDisplay;
-                if (instance.github_org && instance.github_repo) {
-                    const shortPath = instance.github_path ? instance.github_path.split('/').pop() : '';
-                    sourceDisplay = `
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="#666">
-                                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-                            </svg>
-                            <div>
-                                <div style="font-weight: 500; font-size: 13px;">${escapeHtml(instance.github_org)}/${escapeHtml(instance.github_repo)}</div>
-                                <div style="font-size: 11px; color: #666; font-family: monospace;">${escapeHtml(shortPath)}</div>
+                if (item.type === 'notebook') {
+                    if (item.github_org && item.github_repo) {
+                        sourceDisplay = `
+                            <div class="source-info">
+                                <span class="source-main">${escapeHtml(item.github_org)}/${escapeHtml(item.github_repo)}</span>
+                                <span class="source-sub">${escapeHtml(item.github_path || '')}</span>
                             </div>
-                        </div>
-                    `;
+                        `;
+                    } else {
+                        sourceDisplay = `
+                            <div class="source-info">
+                                <span class="source-main">${escapeHtml(item.email || item.id)}</span>
+                                <span class="source-sub">${item.src || 'direct'}</span>
+                            </div>
+                        `;
+                    }
                 } else {
+                    // Space
+                    const repoName = item.repo_url ? item.repo_url.split('/').pop().replace('.git', '') : 'Unknown';
                     sourceDisplay = `
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            <span style="font-size: 14px;">📧</span>
-                            <span>${escapeHtml(instance.email)}</span>
+                        <div class="source-info">
+                            <span class="source-main">${escapeHtml(repoName)}</span>
+                            <span class="source-sub" title="${escapeHtml(item.repo_url || '')}">${escapeHtml(item.src || 'direct')}: ${escapeHtml(item.src_email || '')}</span>
                         </div>
                     `;
                 }
-                
+
+                // GPU badge
+                const gpuDisplay = item.gpu_type ? 
+                    `<span class="gpu-badge">${item.gpu_type.toUpperCase()}${item.gpu_count > 1 ? ' x' + item.gpu_count : ''}</span>` : 
+                    '<span class="gpu-badge">CPU</span>';
+
                 return `
                     <tr>
+                        <td>${typeBadge}</td>
                         <td>${sourceDisplay}</td>
                         <td>
-                            <span class="status-badge status-${instance.status}">
-                                ${instance.status}
+                            <span class="status-badge status-${item.status}">
+                                ${item.status}
                             </span>
                         </td>
+                        <td>${gpuDisplay}</td>
                         <td>
-                            ${instance.url ? 
-                                `<a href="${instance.url}" target="_blank" class="url-link">Open →</a>` : 
+                            ${item.url ? 
+                                `<a href="${item.url}" target="_blank" class="url-link">Open →</a>` : 
                                 '-'
                             }
                         </td>
-                        <td>${formatDate(instance.created_at)}</td>
-                        <td>${instance.uptime_minutes} min</td>
+                        <td>${formatDate(item.created_at)}</td>
+                        <td>${item.uptime_minutes || 0} min</td>
                         <td>
-                            <button class="btn btn-sm btn-danger" onclick="confirmDestroy('${escapeHtml(instance.id)}', '${escapeHtml(instance.email || instance.github_repo)}')">
+                            <button class="btn btn-sm btn-danger" onclick="confirmDestroy('${item.type}', '${escapeHtml(item.id)}', '${escapeHtml(item.displayName)}')">
                                 Destroy
                             </button>
                         </td>
@@ -549,17 +800,18 @@
         }
 
         function escapeHtml(str) {
+            if (!str) return '';
             const div = document.createElement('div');
             div.textContent = str;
             return div.innerHTML;
         }
 
-        function confirmDestroy(instanceId, displayName) {
+        function confirmDestroy(type, instanceId, displayName) {
             confirmAction = 'destroy';
-            confirmData = instanceId;
-            document.getElementById('modalTitle').textContent = 'Destroy Instance';
+            confirmData = { type, instanceId };
+            document.getElementById('modalTitle').textContent = `Destroy ${type.charAt(0).toUpperCase() + type.slice(1)}`;
             document.getElementById('modalMessage').textContent = 
-                `Are you sure you want to destroy the instance for ${displayName}?`;
+                `Are you sure you want to destroy ${displayName}?`;
             document.getElementById('confirmModal').classList.add('active');
         }
 
@@ -568,7 +820,7 @@
             confirmData = null;
             document.getElementById('modalTitle').textContent = 'Destroy All Instances';
             document.getElementById('modalMessage').textContent = 
-                'Are you sure you want to destroy ALL instances? This cannot be undone.';
+                'Are you sure you want to destroy ALL notebooks and spaces? This cannot be undone.';
             document.getElementById('confirmModal').classList.add('active');
         }
 
@@ -579,31 +831,34 @@
         }
 
         async function executeConfirm() {
-            // Save data BEFORE closeModal (which clears them)
             const action = confirmAction;
             const data = confirmData;
             
             closeModal();
 
             if (action === 'destroy' && data) {
-                await destroyInstance(data);
+                await destroyInstance(data.type, data.instanceId);
             } else if (action === 'destroyAll') {
                 await destroyAllInstances();
             }
         }
 
-        async function destroyInstance(instanceId) {
+        async function destroyInstance(type, instanceId) {
             try {
-                const response = await authenticatedFetch(`/api/admin/instance/${encodeURIComponent(instanceId)}`, {
+                const endpoint = type === 'space' ? 
+                    `/api/admin/space/${encodeURIComponent(instanceId)}` :
+                    `/api/admin/instance/${encodeURIComponent(instanceId)}`;
+                    
+                const response = await authenticatedFetch(endpoint, {
                     method: 'DELETE'
                 });
                 const data = await response.json();
                 
                 if (data.success) {
-                    showToast('Instance destroyed successfully');
-                    refreshList();
+                    showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} destroyed successfully`);
+                    refreshAll();
                 } else {
-                    showToast('Failed to destroy instance: ' + (data.detail || 'Unknown error'));
+                    showToast('Failed to destroy: ' + (data.detail || 'Unknown error'));
                 }
             } catch (error) {
                 showToast('Error: ' + error.message);
@@ -612,13 +867,35 @@
 
         async function destroyAllInstances() {
             try {
-                const response = await authenticatedFetch('/api/admin/instances/all', {
-                    method: 'DELETE'
+                // Destroy both notebooks and spaces
+                const [notebooksRes, spacesRes] = await Promise.all([
+                    authenticatedFetch('/api/admin/instances/all', { method: 'DELETE' }),
+                    authenticatedFetch('/api/admin/spaces/all', { method: 'DELETE' })
+                ]);
+                
+                const notebooksData = await notebooksRes.json();
+                const spacesData = await spacesRes.json();
+                
+                const total = (notebooksData.destroyed_count || 0) + (spacesData.destroyed_count || 0);
+                showToast(`Destroyed ${total} instances`);
+                refreshAll();
+            } catch (error) {
+                showToast('Error: ' + error.message);
+            }
+        }
+
+        async function triggerCleanup() {
+            try {
+                const response = await authenticatedFetch('/api/admin/cleanup/all', {
+                    method: 'POST'
                 });
                 const data = await response.json();
                 
-                showToast(`Destroyed ${data.destroyed_count} instances`);
-                refreshList();
+                const notebooksCleaned = data.notebooks_cleaned?.length || 0;
+                const spacesCleaned = data.spaces_cleaned?.length || 0;
+                
+                showToast(`Cleaned up ${notebooksCleaned} notebooks, ${spacesCleaned} spaces`);
+                refreshAll();
             } catch (error) {
                 showToast('Error: ' + error.message);
             }
@@ -634,10 +911,10 @@
         }
 
         // Initial load
-        refreshList();
+        refreshAll();
 
         // Auto refresh every 30 seconds
-        setInterval(refreshList, 30000);
+        setInterval(refreshAll, 30000);
     </script>
 </body>
 </html>

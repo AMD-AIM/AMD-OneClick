@@ -45,8 +45,8 @@ RUN pip install --no-cache-dir /tmp/paddlepaddle_dcu-3.4.0.dev20260123-cp312-cp3
 # ============================================================
 # PaddleX + OCR Dependencies
 # ============================================================
-# Clone PaddleX with ROCm compatibility fixes
-RUN git clone --depth 1 -b feat/concat-markdown-api-rocm \
+# Clone PaddleX with ROCm compatibility fixes + LaTeX delimiter fix
+RUN git clone --depth 1 -b fix/clean-latex-delimiters \
     https://github.com/vivienfanghuagood/PaddleX.git /opt/PaddleX \
     && cd /opt/PaddleX \
     && pip install --no-cache-dir -e ".[ocr]" \
@@ -99,7 +99,7 @@ SubModules:
   LayoutDetection:
     module_name: layout_detection
     model_name: PP-DocLayoutV3
-    model_dir: ./layout_0116
+    model_dir: ./PP-DocLayoutV3-0125
     batch_size: 8
     threshold: 0.3
     layout_nms: True
@@ -132,8 +132,8 @@ SubModules:
       24: "union"
   VLRecognition:
     module_name: vl_recognition
-    model_name: PaddleOCR-VL-1.5-0.9B
-    model_dir: ./checkpoint-5000
+    model_name: PaddleOCR-VL-0.9B
+    model_dir: ./PaddleOCR-VL-0.9B-0125
     batch_size: 4096
     genai_config:
       backend: vllm-server

@@ -1,0 +1,43 @@
+# DaemonSet to pre-pull ppocr-oneclick image to all GPU nodes
+# This ensures faster notebook instance startup
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: image-puller-ppocr
+  namespace: default
+  labels:
+    app: image-puller-ppocr
+spec:
+  selector:
+    matchLabels:
+      app: image-puller-ppocr
+  template:
+    metadata:
+      labels:
+        app: image-puller-ppocr
+    spec:
+      # Tolerate GPU node taints
+      tolerations:
+        - key: "amd.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      # Only run on AMD GPU nodes
+      nodeSelector:
+        doks.digitalocean.com/gpu-brand: "amd"
+      containers:
+        - name: image-puller
+          image: vivienfanghua/vllm_paddle:ppocr-oneclick
+          # Just sleep after pulling - minimal resource usage
+          command: ["/bin/sh", "-c", "echo 'Image pulled successfully at $(date)' && sleep infinity"]
+          imagePullPolicy: Always  # Force pull latest image
+          resources:
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+      # Don't restart unless necessary
+      restartPolicy: Always
+
+

@@ -1,15 +1,16 @@
 """
-FastAPI main application for AMD OneClick Notebook Manager
+FastAPI main application for AMD OneClick Manager
+Extended to support Spaces and Generic Notebooks
 """
 import hashlib
 import logging
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import FastAPI, HTTPException, Depends, Query, Request, Response, Cookie
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 import secrets
@@ -17,13 +18,28 @@ import secrets
 try:
     from .config_ppocr import settings
 except ImportError:
-    from .config import settings
+    try:
+        from .config import settings
+    except ImportError:
+        from config import settings
+
 from .models import (
     NotebookRequest, 
     NotebookStatus, 
     AdminListResponse, 
     NotebookListItem,
-    DestroyResponse
+    DestroyResponse,
+    # New models for Spaces and Generic Notebooks
+    SpaceRequest,
+    SpaceStatus,
+    SpaceListItem,
+    SpaceForkRequest,
+    GenericNotebookRequest,
+    NotebookForkRequest,
+    SrcMeta,
+    ResourcePreset,
+    AdminSpaceListResponse,
+    CombinedAdminResponse,
 )
 from .k8s_client import k8s_client
 from .email_service import send_notebook_url_email
@@ -406,6 +422,277 @@ async def check_github_status(instance_id: str = Query(...)):
 
 
 # =============================================================================
+# Space API Endpoints
+# =============================================================================
+
+@app.post("/api/space/create", response_model=SpaceStatus)
+async def create_space(request: SpaceRequest):
+    """Create a new Space instance
+    
+    This endpoint is designed to be called by external services (ModelScope, AIStudio, etc.)
+    """
+    try:
+        logger.info(f"Creating Space from {request.src_meta.src}: {request.repo_url}")
+        
+        space = k8s_client.create_space(request)
+        
+        return SpaceStatus(
+            status="allocating",
+            message="Allocating resources for your Space...",
+            url=space.get("url"),
+            space_id=space["id"]
+        )
+        
+    except Exception as e:
+        logger.error(f"Error creating Space: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/space/{space_id}", response_model=SpaceStatus)
+async def get_space_status(space_id: str):
+    """Get Space instance status"""
+    try:
+        space = k8s_client.get_space(space_id)
+        
+        if not space:
+            return SpaceStatus(
+                status="not_found",
+                message="Space not found",
+                space_id=space_id
+            )
+        
+        status = k8s_client.get_space_status(space_id)
+        
+        status_messages = {
+            "ready": "Your Space is ready!",
+            "running": "Container is running, starting application...",
+            "pending": "Waiting for resources...",
+            "initializing": "Initializing Space environment...",
+            "loading": "Loading Space image...",
+            "failed": "Space creation failed",
+            "unknown": "Checking status..."
+        }
+        
+        return SpaceStatus(
+            status=status or "unknown",
+            message=status_messages.get(status, "Checking status..."),
+            url=space.get("url"),
+            space_id=space_id
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting Space status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/space/{space_id}/logs")
+async def get_space_logs(space_id: str, tail_lines: int = Query(default=100, le=1000)):
+    """Get Space instance logs"""
+    try:
+        logs = k8s_client.get_space_logs(space_id, tail_lines)
+        
+        if logs is None:
+            raise HTTPException(status_code=404, detail="Space not found")
+        
+        return {
+            "space_id": space_id,
+            "logs": logs
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting Space logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/space/{space_id}", response_model=DestroyResponse)
+async def delete_space(space_id: str):
+    """Delete a Space instance"""
+    try:
+        success = k8s_client.delete_space(space_id)
+        
+        return DestroyResponse(
+            success=success,
+            message=f"Space {space_id} {'deleted' if success else 'not found'}",
+            destroyed_count=1 if success else 0
+        )
+        
+    except Exception as e:
+        logger.error(f"Error deleting Space: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/space/{space_id}/fork", response_model=SpaceStatus)
+async def fork_space(space_id: str, request: SpaceForkRequest):
+    """Fork an existing Space to create a new instance"""
+    try:
+        new_space = k8s_client.fork_space(
+            space_id,
+            request.src_meta,
+            request.resource_preset
+        )
+        
+        if not new_space:
+            raise HTTPException(status_code=404, detail="Original Space not found")
+        
+        return SpaceStatus(
+            status="allocating",
+            message="Forking Space...",
+            url=new_space.get("url"),
+            space_id=new_space["id"]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error forking Space: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# Generic Notebook API Endpoints
+# =============================================================================
+
+@app.post("/api/notebook/create", response_model=NotebookStatus)
+async def create_generic_notebook(request: GenericNotebookRequest):
+    """Create a new generic Notebook instance
+    
+    This endpoint is designed to be called by external services (ModelScope, AIStudio, etc.)
+    """
+    try:
+        logger.info(f"Creating Notebook from {request.src_meta.src}: {request.notebook_url}")
+        
+        notebook = k8s_client.create_generic_notebook(request)
+        
+        return NotebookStatus(
+            status="allocating",
+            message="Allocating resources for your Notebook...",
+            url=notebook.get("url"),
+            instance_id=notebook["id"]
+        )
+        
+    except Exception as e:
+        logger.error(f"Error creating generic Notebook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/notebook/{instance_id}/fork", response_model=NotebookStatus)
+async def fork_notebook(instance_id: str, request: NotebookForkRequest):
+    """Fork an existing Notebook to create a new instance"""
+    try:
+        new_notebook = k8s_client.fork_notebook(
+            instance_id,
+            request.src_meta,
+            request.resource_preset
+        )
+        
+        if not new_notebook:
+            raise HTTPException(status_code=404, detail="Original Notebook not found or cannot be forked")
+        
+        return NotebookStatus(
+            status="allocating",
+            message="Forking Notebook...",
+            url=new_notebook.get("url"),
+            instance_id=new_notebook["id"]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error forking Notebook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# Configuration API Endpoints
+# =============================================================================
+
+@app.get("/api/config/resources")
+async def get_resource_presets():
+    """Get available resource configurations"""
+    try:
+        if hasattr(settings, 'get_available_presets'):
+            presets = settings.get_available_presets()
+            return {
+                "presets": [
+                    {
+                        "id": p.id,
+                        "name": p.name,
+                        "description": p.description,
+                        "spec": p.spec.model_dump(),
+                        "available": p.available
+                    }
+                    for p in presets
+                ]
+            }
+        else:
+            # Fallback for legacy config
+            return {
+                "presets": [
+                    {
+                        "id": "mi300x-1",
+                        "name": "AMD MI300X x1",
+                        "description": "Single MI300X GPU",
+                        "spec": {
+                            "gpu_type": "mi300x",
+                            "gpu_count": 1,
+                            "cpu_cores": "64",
+                            "memory": "128Gi"
+                        },
+                        "available": True
+                    }
+                ]
+            }
+    except Exception as e:
+        logger.error(f"Error getting resource presets: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/config/images")
+async def get_available_images():
+    """Get available Docker images"""
+    try:
+        if hasattr(settings, 'AVAILABLE_IMAGES') and isinstance(settings.AVAILABLE_IMAGES, dict):
+            return {
+                "images": [
+                    {"key": key, "url": url}
+                    for key, url in settings.AVAILABLE_IMAGES.items()
+                ]
+            }
+        else:
+            # Fallback for legacy config (list format)
+            images = getattr(settings, 'AVAILABLE_IMAGES', [])
+            return {
+                "images": [
+                    {"key": img.split("/")[-1].split(":")[0], "url": img}
+                    for img in images
+                ]
+            }
+    except Exception as e:
+        logger.error(f"Error getting available images: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/config/envs")
+async def get_conda_environments():
+    """Get available Conda environments"""
+    try:
+        if hasattr(settings, 'CONDA_ENVS'):
+            return {
+                "environments": [
+                    {"name": name, "url": url}
+                    for name, url in settings.CONDA_ENVS.items()
+                ]
+            }
+        else:
+            return {"environments": []}
+    except Exception as e:
+        logger.error(f"Error getting conda environments: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
 # Admin Endpoints
 # =============================================================================
 
@@ -422,10 +709,20 @@ async def admin_page(request: Request, username: str = Depends(verify_admin)):
 
 
 @app.get("/api/admin/instances", response_model=AdminListResponse)
-async def list_instances(username: str = Depends(verify_admin)):
-    """List all notebook instances"""
+async def list_instances(
+    username: str = Depends(verify_admin),
+    src: Optional[str] = Query(None, description="Filter by source (modelscope, aistudio, github)"),
+    gpu_type: Optional[str] = Query(None, description="Filter by GPU type (mi300x, mi355x, r7900, cpu)")
+):
+    """List all notebook instances with optional filtering"""
     try:
         instances = k8s_client.list_instances()
+        
+        # Apply filters
+        if src:
+            instances = [i for i in instances if i.get("src") == src]
+        if gpu_type:
+            instances = [i for i in instances if i.get("gpu_type") == gpu_type]
         
         items = [
             NotebookListItem(
@@ -439,14 +736,20 @@ async def list_instances(username: str = Depends(verify_admin)):
                 uptime_minutes=inst.get("uptime_minutes", 0),
                 github_org=inst.get("github_org"),
                 github_repo=inst.get("github_repo"),
-                github_path=inst.get("github_path")
+                github_path=inst.get("github_path"),
+                instance_type="notebook",
+                src=inst.get("src"),
+                gpu_type=inst.get("gpu_type"),
+                gpu_count=inst.get("gpu_count")
             )
             for inst in instances
         ]
         
         return AdminListResponse(
             instances=items,
-            total_count=len(items)
+            total_count=len(items),
+            notebook_count=len(items),
+            space_count=0
         )
         
     except Exception as e:
@@ -506,6 +809,179 @@ async def trigger_cleanup(username: str = Depends(verify_admin)):
 
 
 # =============================================================================
+# Admin Space Endpoints
+# =============================================================================
+
+@app.get("/api/admin/spaces", response_model=AdminSpaceListResponse)
+async def list_spaces(
+    username: str = Depends(verify_admin),
+    src: Optional[str] = Query(None, description="Filter by source (modelscope, aistudio, github)"),
+    gpu_type: Optional[str] = Query(None, description="Filter by GPU type")
+):
+    """List all Space instances with optional filtering"""
+    try:
+        spaces = k8s_client.list_spaces()
+        
+        # Apply filters
+        if src:
+            spaces = [s for s in spaces if s.get("src") == src]
+        if gpu_type:
+            spaces = [s for s in spaces if s.get("gpu_type") == gpu_type]
+        
+        items = [
+            SpaceListItem(
+                id=sp["id"],
+                repo_url=sp["repo_url"],
+                start_command=sp["start_command"],
+                src=sp.get("src", ""),
+                src_email=sp.get("src_email"),
+                status=sp["status"],
+                url=sp.get("url"),
+                created_at=sp.get("created_at", ""),
+                uptime_minutes=sp.get("uptime_minutes", 0),
+                gpu_type=sp.get("gpu_type", "unknown"),
+                gpu_count=sp.get("gpu_count", 1)
+            )
+            for sp in spaces
+        ]
+        
+        return AdminSpaceListResponse(
+            spaces=items,
+            total_count=len(items)
+        )
+        
+    except Exception as e:
+        logger.error(f"Error listing spaces: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/admin/space/{space_id}", response_model=DestroyResponse)
+async def admin_destroy_space(space_id: str, username: str = Depends(verify_admin)):
+    """Destroy a specific Space instance by ID (admin)"""
+    try:
+        success = k8s_client.delete_space(space_id)
+        
+        return DestroyResponse(
+            success=success,
+            message=f"Space {space_id} {'destroyed' if success else 'not found'}",
+            destroyed_count=1 if success else 0
+        )
+        
+    except Exception as e:
+        logger.error(f"Error destroying Space {space_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/admin/spaces/all", response_model=DestroyResponse)
+async def destroy_all_spaces(username: str = Depends(verify_admin)):
+    """Destroy all Space instances"""
+    try:
+        count = k8s_client.delete_all_spaces()
+        
+        return DestroyResponse(
+            success=True,
+            message=f"Destroyed {count} spaces",
+            destroyed_count=count
+        )
+        
+    except Exception as e:
+        logger.error(f"Error destroying all spaces: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/admin/cleanup/all")
+async def trigger_cleanup_all(username: str = Depends(verify_admin)):
+    """Manually trigger cleanup of both idle notebooks and spaces"""
+    try:
+        result = k8s_client.cleanup_all_idle()
+        
+        total_cleaned = len(result.get("notebooks", [])) + len(result.get("spaces", []))
+        
+        return {
+            "success": True,
+            "message": f"Cleaned up {total_cleaned} instances",
+            "notebooks_cleaned": result.get("notebooks", []),
+            "spaces_cleaned": result.get("spaces", [])
+        }
+        
+    except Exception as e:
+        logger.error(f"Error during cleanup: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/admin/all", response_model=CombinedAdminResponse)
+async def list_all_instances(
+    username: str = Depends(verify_admin),
+    src: Optional[str] = Query(None, description="Filter by source"),
+    gpu_type: Optional[str] = Query(None, description="Filter by GPU type")
+):
+    """List all instances (notebooks and spaces) combined"""
+    try:
+        # Get notebooks
+        notebooks = k8s_client.list_instances()
+        if src:
+            notebooks = [n for n in notebooks if n.get("src") == src]
+        if gpu_type:
+            notebooks = [n for n in notebooks if n.get("gpu_type") == gpu_type]
+        
+        notebook_items = [
+            NotebookListItem(
+                id=inst["id"],
+                email=inst["email"],
+                pod_name=inst["pod_name"],
+                url=inst.get("url", ""),
+                status=inst["status"],
+                created_at=inst.get("created_at", ""),
+                last_activity=inst.get("last_activity"),
+                uptime_minutes=inst.get("uptime_minutes", 0),
+                github_org=inst.get("github_org"),
+                github_repo=inst.get("github_repo"),
+                github_path=inst.get("github_path"),
+                instance_type="notebook",
+                src=inst.get("src"),
+                gpu_type=inst.get("gpu_type"),
+                gpu_count=inst.get("gpu_count")
+            )
+            for inst in notebooks
+        ]
+        
+        # Get spaces
+        spaces = k8s_client.list_spaces()
+        if src:
+            spaces = [s for s in spaces if s.get("src") == src]
+        if gpu_type:
+            spaces = [s for s in spaces if s.get("gpu_type") == gpu_type]
+        
+        space_items = [
+            SpaceListItem(
+                id=sp["id"],
+                repo_url=sp["repo_url"],
+                start_command=sp["start_command"],
+                src=sp.get("src", ""),
+                src_email=sp.get("src_email"),
+                status=sp["status"],
+                url=sp.get("url"),
+                created_at=sp.get("created_at", ""),
+                uptime_minutes=sp.get("uptime_minutes", 0),
+                gpu_type=sp.get("gpu_type", "unknown"),
+                gpu_count=sp.get("gpu_count", 1)
+            )
+            for sp in spaces
+        ]
+        
+        return CombinedAdminResponse(
+            notebooks=notebook_items,
+            spaces=space_items,
+            total_notebooks=len(notebook_items),
+            total_spaces=len(space_items)
+        )
+        
+    except Exception as e:
+        logger.error(f"Error listing all instances: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
 # Health Check
 # =============================================================================
 
@@ -518,9 +994,24 @@ async def health_check():
 @app.get("/api/config")
 async def get_config():
     """Get public configuration"""
-    return {
+    config = {
         "available_images": settings.AVAILABLE_IMAGES,
-        "default_image": settings.DEFAULT_IMAGE,
+        "default_image": getattr(settings, 'DEFAULT_IMAGE', ''),
+        "default_notebook_image": getattr(settings, 'DEFAULT_NOTEBOOK_IMAGE', getattr(settings, 'DEFAULT_IMAGE', '')),
+        "default_space_image": getattr(settings, 'DEFAULT_SPACE_IMAGE', getattr(settings, 'DEFAULT_IMAGE', '')),
         "max_lifetime_hours": settings.MAX_LIFETIME_HOURS,
-        "idle_timeout_minutes": settings.IDLE_TIMEOUT_MINUTES
+        "idle_timeout_minutes": settings.IDLE_TIMEOUT_MINUTES,
+        "notebook_port": settings.NOTEBOOK_PORT,
+        "space_default_port": getattr(settings, 'SPACE_DEFAULT_PORT', 7860),
     }
+    
+    # Include resource presets if available
+    if hasattr(settings, 'get_available_presets'):
+        presets = settings.get_available_presets()
+        config["resource_presets"] = [p.id for p in presets]
+    
+    # Include conda environments if available
+    if hasattr(settings, 'CONDA_ENVS'):
+        config["conda_environments"] = list(settings.CONDA_ENVS.keys())
+    
+    return config

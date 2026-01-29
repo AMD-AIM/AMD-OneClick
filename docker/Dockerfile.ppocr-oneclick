@@ -24,8 +24,9 @@ RUN pip install --no-cache-dir jupyter jupyterlab
 # Models (pre-downloaded for faster startup)
 # ============================================================
 # Copy models from build context (build from docker/ directory)
-COPY models/checkpoint-5000 /opt/PaddleX/checkpoint-5000
-COPY models/layout_0116 /opt/PaddleX/layout_0116
+# Updated to 0125 versions
+COPY models/PaddleOCR-VL-0.9B-0125 /opt/PaddleX/PaddleOCR-VL-0.9B-0125
+COPY models/PP-DocLayoutV3-0125 /opt/PaddleX/PP-DocLayoutV3-0125
 
 # ============================================================
 # Entrypoint Script
@@ -59,8 +60,8 @@ echo "[1/3] Starting vLLM server in background..."
 export PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
 
 nohup paddlex_genai_server \
-    --model_name "${MODEL_NAME:-PaddleOCR-VL-1.5-0.9B}" \
-    --model_dir ./checkpoint-5000 \
+    --model_name "${MODEL_NAME:-PaddleOCR-VL-0.9B}" \
+    --model_dir ./PaddleOCR-VL-0.9B-0125 \
     --backend vllm \
     --host 0.0.0.0 \
     --port ${VLLM_PORT:-8118} \

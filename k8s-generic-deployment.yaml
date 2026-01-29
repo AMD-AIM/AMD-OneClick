@@ -1,0 +1,150 @@
+# AMD OneClick Generic Manager - Kubernetes Deployment
+# Supports both Notebooks and Spaces with dynamic resource configuration
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: amd-oneclick-manager
+  namespace: default
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: amd-oneclick-manager
+  namespace: default
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: amd-oneclick-manager
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: amd-oneclick-manager
+subjects:
+  - kind: ServiceAccount
+    name: amd-oneclick-manager
+    namespace: default
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: amd-oneclick-config
+  namespace: default
+data:
+  K8S_NAMESPACE: "default"
+  
+  # Default Images
+  DEFAULT_IMAGE: "rocm/vllm-dev:nightly_main_20260125"
+  DEFAULT_NOTEBOOK_IMAGE: "rocm/vllm-dev:nightly_main_20260125"
+  DEFAULT_SPACE_IMAGE: "rocm/vllm-dev:nightly_main_20260125"
+  
+  # Label Prefixes
+  NOTEBOOK_LABEL_PREFIX: "amd-oneclick-notebook"
+  SPACE_LABEL_PREFIX: "amd-oneclick-space"
+  
+  # Default Resource Configuration (legacy compatibility)
+  CPU_LIMIT: "64"
+  MEMORY_LIMIT: "128Gi"
+  GPU_LIMIT: "1"
+  CPU_REQUEST: "32"
+  MEMORY_REQUEST: "64Gi"
+  
+  # Ports
+  NOTEBOOK_PORT: "8888"
+  SPACE_DEFAULT_PORT: "7860"
+  
+  # Cleanup Configuration
+  IDLE_TIMEOUT_MINUTES: "30"
+  MAX_LIFETIME_HOURS: "12"
+  
+  # Service Configuration
+  SERVICE_HOST: "129.212.240.184"  # TODO: Update with domain later
+  NODE_PORT_BASE: "30100"
+  NOTEBOOK_TOKEN: "amd-oneclick"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: amd-oneclick-secrets
+  namespace: default
+type: Opaque
+stringData:
+  ADMIN_PASSWORD: "admin123"  # Change in production!
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: amd-oneclick-manager
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: amd-oneclick-manager
+  template:
+    metadata:
+      labels:
+        app: amd-oneclick-manager
+    spec:
+      serviceAccountName: amd-oneclick-manager
+      containers:
+        - name: manager
+          image: docker.io/vivienfanghua/amd-oneclick-manager:latest
+          imagePullPolicy: Always
+          workingDir: /app
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: amd-oneclick-config
+            - secretRef:
+                name: amd-oneclick-secrets
+          resources:
+            limits:
+              cpu: "2"
+              memory: "1Gi"
+            requests:
+              cpu: "500m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+
+---
+# Manager Service - ClusterIP (accessed via Nginx proxy)
+apiVersion: v1
+kind: Service
+metadata:
+  name: amd-oneclick-manager
+  namespace: default
+spec:
+  selector:
+    app: amd-oneclick-manager
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: 8000
+
