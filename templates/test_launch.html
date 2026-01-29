@@ -662,6 +662,8 @@
         
         // Status polling functions
         function startPolling(type, instanceId) {
+            console.log(`Starting polling for ${type}: ${instanceId}`);
+            
             // Clear any existing polling
             if (pollingIntervals[type]) {
                 clearInterval(pollingIntervals[type]);
@@ -670,11 +672,13 @@
             const section = document.getElementById(`${type}-status-section`);
             section.style.display = 'block';
             
-            updateStatus(type, 'pending', 'Instance created, initializing...', 10);
+            updateStatus(type, 'pending', '⏳ Instance created, waiting for pod...', 10);
             
-            // Start polling
-            pollingIntervals[type] = setInterval(async () => {
+            // Define the poll function
+            const pollOnce = async () => {
                 try {
+                    console.log(`Polling ${type}: ${instanceId}`);
+                    
                     // Poll status
                     const statusUrl = type === 'notebook' 
                         ? `/api/notebook/${instanceId}/status`
@@ -682,6 +686,8 @@
                     
                     const statusRes = await fetch(statusUrl);
                     const statusData = await statusRes.json();
+                    
+                    console.log('Status response:', statusData);
                     
                     const status = statusData.status;
                     const message = statusData.message || getStatusMessage(status);
@@ -694,19 +700,21 @@
                     
                     // Stop polling if ready or failed
                     if (status === 'ready' || status === 'failed') {
+                        console.log(`Stopping polling: ${status}`);
                         clearInterval(pollingIntervals[type]);
                         pollingIntervals[type] = null;
-                        
-                        if (status === 'ready') {
-                            // Show the logs automatically when ready
-                            const logsContainer = document.getElementById(`${type}-logs`);
-                            logsContainer.style.display = 'block';
-                        }
                     }
+                    
+                    return status;
                 } catch (error) {
                     console.error('Polling error:', error);
+                    return null;
                 }
-            }, 3000); // Poll every 3 seconds
+            };
+            
+            // Poll immediately, then every 2 seconds
+            pollOnce();
+            pollingIntervals[type] = setInterval(pollOnce, 2000);
         }
         
         function updateStatus(type, status, message, progress) {
@@ -950,11 +958,12 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    showResult('space', true, 'Space Created!', `Instance ID: ${data.instance_id}`, data.url);
+                    const spaceId = data.space_id || data.instance_id;
+                    showResult('space', true, 'Space Created!', `Instance ID: ${spaceId}`, data.url);
                     
                     // Start polling for status and logs
-                    if (data.instance_id) {
-                        startPolling('space', data.instance_id);
+                    if (spaceId) {
+                        startPolling('space', spaceId);
                     }
                 } else {
                     showResult('space', false, 'Failed to create space', data.detail || data);
