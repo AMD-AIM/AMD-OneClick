@@ -822,6 +822,13 @@ fi
 # Set Gradio to listen on all interfaces (required for K8s networking)
 export GRADIO_SERVER_NAME="0.0.0.0"
 
+# Set Gradio root path for reverse proxy (fixes file URL generation)
+export GRADIO_ROOT_PATH="/space/${SPACE_ID}"
+
+echo "=== Environment configured ==="
+echo "GRADIO_SERVER_NAME=${GRADIO_SERVER_NAME}"
+echo "GRADIO_ROOT_PATH=${GRADIO_ROOT_PATH}"
+
 # Run the start command
 echo "Starting application with: ${START_COMMAND}"
 exec ${START_COMMAND}
@@ -1120,6 +1127,21 @@ exec ${START_COMMAND}
             if e.status == 404:
                 return None
             raise
+    
+    def get_notebook_logs(self, instance_id: str, tail_lines: int = 100) -> Optional[str]:
+        """Get Notebook pod logs"""
+        try:
+            logs = self.core_v1.read_namespaced_pod_log(
+                name=instance_id,
+                namespace=self.namespace,
+                tail_lines=tail_lines
+            )
+            return logs
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            logger.error(f"Error getting Notebook logs: {e}")
+            return None
     
     def get_space_logs(self, space_id: str, tail_lines: int = 100) -> Optional[str]:
         """Get Space pod logs"""

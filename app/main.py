@@ -613,6 +613,69 @@ async def fork_notebook(instance_id: str, request: NotebookForkRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/notebook/{instance_id}/status")
+async def get_notebook_status(instance_id: str):
+    """Get Notebook instance status with detailed info"""
+    try:
+        instance = k8s_client.get_instance_by_id(instance_id)
+        
+        if not instance:
+            raise HTTPException(status_code=404, detail="Notebook not found")
+        
+        # Get pod status for more details
+        pod_status = k8s_client.get_pod_status(None, instance_id)
+        
+        return {
+            "instance_id": instance_id,
+            "status": pod_status or instance.get("status", "unknown"),
+            "url": instance.get("url"),
+            "created_at": instance.get("created_at"),
+            "message": _get_status_message(pod_status)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting Notebook status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/notebook/{instance_id}/logs")
+async def get_notebook_logs(instance_id: str, tail_lines: int = Query(default=100, le=1000)):
+    """Get Notebook instance logs"""
+    try:
+        logs = k8s_client.get_notebook_logs(instance_id, tail_lines)
+        
+        if logs is None:
+            raise HTTPException(status_code=404, detail="Notebook not found")
+        
+        return {
+            "instance_id": instance_id,
+            "logs": logs
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting Notebook logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _get_status_message(status: str) -> str:
+    """Get human-readable status message"""
+    messages = {
+        "pending": "Instance is being created...",
+        "initializing": "Container is initializing...",
+        "loading": "Loading dependencies...",
+        "running": "Instance is starting up...",
+        "jupyter_starting": "Jupyter Lab is starting...",
+        "ready": "Instance is ready!",
+        "failed": "Instance failed to start",
+        "unknown": "Status unknown"
+    }
+    return messages.get(status, f"Status: {status}")
+
+
 # =============================================================================
 # Configuration API Endpoints
 # =============================================================================

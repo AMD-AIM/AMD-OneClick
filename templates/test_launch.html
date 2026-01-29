@@ -333,6 +333,83 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+
+        /* Status Section Styles */
+        .status-section {
+            margin-top: 24px;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .status-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--warning);
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-indicator.ready {
+            background: var(--success);
+            animation: none;
+        }
+
+        .status-indicator.failed {
+            background: #ef4444;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: var(--bg-card);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--warning));
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .logs-container {
+            background: #0d0d12;
+            border-radius: 8px;
+            padding: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .logs-container pre {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin: 0;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+            margin-left: auto;
+        }
     </style>
 </head>
 <body>
@@ -405,6 +482,21 @@
                     <div class="result-title" id="notebook-result-title"></div>
                     <div class="result-content" id="notebook-result-content"></div>
                     <a class="result-url" id="notebook-result-url" target="_blank" style="display:none;"></a>
+                </div>
+
+                <!-- Status and Logs Section -->
+                <div class="status-section" id="notebook-status-section" style="display:none;">
+                    <div class="status-header">
+                        <span class="status-indicator" id="notebook-status-indicator"></span>
+                        <span id="notebook-status-text">Initializing...</span>
+                        <button class="btn btn-sm" onclick="toggleLogs('notebook')">📜 Toggle Logs</button>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="notebook-progress"></div>
+                    </div>
+                    <div class="logs-container" id="notebook-logs" style="display:none;">
+                        <pre id="notebook-logs-content"></pre>
+                    </div>
                 </div>
             </div>
         </div>
@@ -489,6 +581,21 @@
                     <div class="result-content" id="space-result-content"></div>
                     <a class="result-url" id="space-result-url" target="_blank" style="display:none;"></a>
                 </div>
+
+                <!-- Status and Logs Section -->
+                <div class="status-section" id="space-status-section" style="display:none;">
+                    <div class="status-header">
+                        <span class="status-indicator" id="space-status-indicator"></span>
+                        <span id="space-status-text">Initializing...</span>
+                        <button class="btn btn-sm" onclick="toggleLogs('space')">📜 Toggle Logs</button>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="space-progress"></div>
+                    </div>
+                    <div class="logs-container" id="space-logs" style="display:none;">
+                        <pre id="space-logs-content"></pre>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -498,6 +605,12 @@
         let images = [];
         let selectedNotebookPreset = 'mi300x-1';
         let selectedSpacePreset = 'mi300x-1';
+        
+        // Polling state
+        let pollingIntervals = {
+            notebook: null,
+            space: null
+        };
 
         // Load config on page load
         async function loadConfig() {
@@ -526,6 +639,117 @@
             } catch (error) {
                 console.error('Failed to load config:', error);
             }
+        }
+        
+        // Status polling functions
+        function startPolling(type, instanceId) {
+            // Clear any existing polling
+            if (pollingIntervals[type]) {
+                clearInterval(pollingIntervals[type]);
+            }
+            
+            const section = document.getElementById(`${type}-status-section`);
+            section.style.display = 'block';
+            
+            updateStatus(type, 'pending', 'Instance created, initializing...', 10);
+            
+            // Start polling
+            pollingIntervals[type] = setInterval(async () => {
+                try {
+                    // Poll status
+                    const statusUrl = type === 'notebook' 
+                        ? `/api/notebook/${instanceId}/status`
+                        : `/api/space/${instanceId}`;
+                    
+                    const statusRes = await fetch(statusUrl);
+                    const statusData = await statusRes.json();
+                    
+                    const status = statusData.status;
+                    const message = statusData.message || getStatusMessage(status);
+                    const progress = getProgressForStatus(status);
+                    
+                    updateStatus(type, status, message, progress);
+                    
+                    // Fetch logs
+                    await fetchLogs(type, instanceId);
+                    
+                    // Stop polling if ready or failed
+                    if (status === 'ready' || status === 'failed') {
+                        clearInterval(pollingIntervals[type]);
+                        pollingIntervals[type] = null;
+                        
+                        if (status === 'ready') {
+                            // Show the logs automatically when ready
+                            const logsContainer = document.getElementById(`${type}-logs`);
+                            logsContainer.style.display = 'block';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 3000); // Poll every 3 seconds
+        }
+        
+        function updateStatus(type, status, message, progress) {
+            const indicator = document.getElementById(`${type}-status-indicator`);
+            const text = document.getElementById(`${type}-status-text`);
+            const progressBar = document.getElementById(`${type}-progress`);
+            
+            indicator.className = `status-indicator ${status === 'ready' ? 'ready' : status === 'failed' ? 'failed' : ''}`;
+            text.textContent = message;
+            progressBar.style.width = `${progress}%`;
+        }
+        
+        function getStatusMessage(status) {
+            const messages = {
+                'pending': '⏳ Pod is being scheduled...',
+                'initializing': '🔄 Container initializing...',
+                'loading': '📦 Loading dependencies...',
+                'running': '🚀 Application starting...',
+                'jupyter_starting': '📓 Jupyter Lab starting...',
+                'ready': '✅ Instance is ready!',
+                'failed': '❌ Instance failed to start'
+            };
+            return messages[status] || `Status: ${status}`;
+        }
+        
+        function getProgressForStatus(status) {
+            const progressMap = {
+                'pending': 15,
+                'initializing': 30,
+                'loading': 50,
+                'running': 70,
+                'jupyter_starting': 85,
+                'ready': 100,
+                'failed': 100
+            };
+            return progressMap[status] || 20;
+        }
+        
+        async function fetchLogs(type, instanceId) {
+            try {
+                const logsUrl = type === 'notebook'
+                    ? `/api/notebook/${instanceId}/logs?tail_lines=100`
+                    : `/api/space/${instanceId}/logs?tail_lines=100`;
+                
+                const logsRes = await fetch(logsUrl);
+                if (logsRes.ok) {
+                    const logsData = await logsRes.json();
+                    const logsContent = document.getElementById(`${type}-logs-content`);
+                    logsContent.textContent = logsData.logs || 'No logs available yet...';
+                    
+                    // Auto-scroll to bottom
+                    const logsContainer = document.getElementById(`${type}-logs`);
+                    logsContainer.scrollTop = logsContainer.scrollHeight;
+                }
+            } catch (error) {
+                console.error('Failed to fetch logs:', error);
+            }
+        }
+        
+        function toggleLogs(type) {
+            const logsContainer = document.getElementById(`${type}-logs`);
+            logsContainer.style.display = logsContainer.style.display === 'none' ? 'block' : 'none';
         }
 
         function renderPresets(containerId, selected, onClick) {
@@ -589,6 +813,9 @@
             const btn = document.getElementById('notebook-btn');
             btn.disabled = true;
             btn.innerHTML = '<span class="loading"></span> Launching...';
+            
+            // Hide previous status section
+            document.getElementById('notebook-status-section').style.display = 'none';
 
             const payload = {
                 notebook_url: document.getElementById('notebook-url').value,
@@ -615,7 +842,12 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    showResult('notebook', true, 'Notebook Created!', data, data.url);
+                    showResult('notebook', true, 'Notebook Created!', `Instance ID: ${data.instance_id}`, data.url);
+                    
+                    // Start polling for status and logs
+                    if (data.instance_id) {
+                        startPolling('notebook', data.instance_id);
+                    }
                 } else {
                     showResult('notebook', false, 'Failed to create notebook', data.detail || data);
                 }
@@ -631,6 +863,9 @@
             const btn = document.getElementById('space-btn');
             btn.disabled = true;
             btn.innerHTML = '<span class="loading"></span> Launching...';
+            
+            // Hide previous status section
+            document.getElementById('space-status-section').style.display = 'none';
 
             const payload = {
                 repo_url: document.getElementById('space-repo').value,
@@ -674,7 +909,12 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    showResult('space', true, 'Space Created!', data, data.url);
+                    showResult('space', true, 'Space Created!', `Instance ID: ${data.instance_id}`, data.url);
+                    
+                    // Start polling for status and logs
+                    if (data.instance_id) {
+                        startPolling('space', data.instance_id);
+                    }
                 } else {
                     showResult('space', false, 'Failed to create space', data.detail || data);
                 }
