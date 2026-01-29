@@ -773,20 +773,13 @@ fi
 # Try to read Gradio version from README.md (HuggingFace Spaces format)
 GRADIO_VERSION=""
 if [ -f README.md ]; then
-    echo "DEBUG: README.md exists, checking content..."
-    echo "DEBUG: First 10 lines of README.md:"
-    head -10 README.md
     # Use grep and awk for maximum compatibility
     GRADIO_VERSION=$(grep '^sdk_version:' README.md | awk -F: '{gsub(/[[:space:]]/,"",$2); print $2}' | head -1)
-    echo "DEBUG: Extracted GRADIO_VERSION='${GRADIO_VERSION}'"
     if [ -n "${GRADIO_VERSION}" ]; then
         echo "Found SDK version in README: ${GRADIO_VERSION}"
     else
-        echo "No SDK version found in README"
+        echo "No SDK version found in README, using latest"
     fi
-else
-    echo "DEBUG: README.md not found in $(pwd)"
-    ls -la
 fi
 
 # Install requirements if exists
