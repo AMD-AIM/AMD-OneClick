@@ -392,18 +392,35 @@
             background: #0d0d12;
             border-radius: 8px;
             padding: 12px;
-            max-height: 300px;
+            max-height: 400px;
             overflow-y: auto;
+            border: 1px solid var(--border);
+        }
+
+        .logs-header {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent);
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
         }
 
         .logs-container pre {
             font-family: 'JetBrains Mono', monospace;
             font-size: 12px;
-            color: var(--text-secondary);
+            color: #c0c0c0;
             white-space: pre-wrap;
             word-break: break-all;
             margin: 0;
+            line-height: 1.5;
         }
+
+        /* Highlight important log lines */
+        .logs-container pre .log-info { color: #3b82f6; }
+        .logs-container pre .log-success { color: #22c55e; }
+        .logs-container pre .log-warning { color: #f59e0b; }
+        .logs-container pre .log-error { color: #ef4444; }
 
         .btn-sm {
             padding: 6px 12px;
@@ -489,13 +506,14 @@
                     <div class="status-header">
                         <span class="status-indicator" id="notebook-status-indicator"></span>
                         <span id="notebook-status-text">Initializing...</span>
-                        <button class="btn btn-sm" onclick="toggleLogs('notebook')">📜 Toggle Logs</button>
+                        <button class="btn btn-sm" onclick="toggleLogs('notebook')">📜 Hide Logs</button>
                     </div>
                     <div class="progress-bar">
                         <div class="progress-fill" id="notebook-progress"></div>
                     </div>
-                    <div class="logs-container" id="notebook-logs" style="display:none;">
-                        <pre id="notebook-logs-content"></pre>
+                    <div class="logs-container" id="notebook-logs">
+                        <div class="logs-header">📋 Application Logs (auto-refreshing)</div>
+                        <pre id="notebook-logs-content">Waiting for container to start...</pre>
                     </div>
                 </div>
             </div>
@@ -514,7 +532,7 @@
 
                 <div class="form-group">
                     <label>Repository URL *</label>
-                    <input type="text" id="space-repo" placeholder="https://github.com/user/repo.git">
+                    <input type="text" id="space-repo" value="https://huggingface.co/spaces/Wan-AI/Wan-2.2-5B" placeholder="https://huggingface.co/spaces/xxx/yyy">
                 </div>
 
                 <div class="form-group">
@@ -587,13 +605,14 @@
                     <div class="status-header">
                         <span class="status-indicator" id="space-status-indicator"></span>
                         <span id="space-status-text">Initializing...</span>
-                        <button class="btn btn-sm" onclick="toggleLogs('space')">📜 Toggle Logs</button>
+                        <button class="btn btn-sm" onclick="toggleLogs('space')">📜 Hide Logs</button>
                     </div>
                     <div class="progress-bar">
                         <div class="progress-fill" id="space-progress"></div>
                     </div>
-                    <div class="logs-container" id="space-logs" style="display:none;">
-                        <pre id="space-logs-content"></pre>
+                    <div class="logs-container" id="space-logs">
+                        <div class="logs-header">📋 Application Logs (auto-refreshing)</div>
+                        <pre id="space-logs-content">Waiting for container to start...</pre>
                     </div>
                 </div>
             </div>
@@ -729,14 +748,20 @@
         async function fetchLogs(type, instanceId) {
             try {
                 const logsUrl = type === 'notebook'
-                    ? `/api/notebook/${instanceId}/logs?tail_lines=100`
-                    : `/api/space/${instanceId}/logs?tail_lines=100`;
+                    ? `/api/notebook/${instanceId}/logs?tail_lines=200`
+                    : `/api/space/${instanceId}/logs?tail_lines=200`;
                 
                 const logsRes = await fetch(logsUrl);
                 if (logsRes.ok) {
                     const logsData = await logsRes.json();
                     const logsContent = document.getElementById(`${type}-logs-content`);
-                    logsContent.textContent = logsData.logs || 'No logs available yet...';
+                    const rawLogs = logsData.logs || 'Waiting for application logs...';
+                    // Use innerHTML to support formatting, escape HTML first
+                    const escapedLogs = rawLogs
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;');
+                    logsContent.innerHTML = formatLogs(escapedLogs);
                     
                     // Auto-scroll to bottom
                     const logsContainer = document.getElementById(`${type}-logs`);
@@ -749,7 +774,23 @@
         
         function toggleLogs(type) {
             const logsContainer = document.getElementById(`${type}-logs`);
-            logsContainer.style.display = logsContainer.style.display === 'none' ? 'block' : 'none';
+            const btn = event.target;
+            if (logsContainer.style.display === 'none') {
+                logsContainer.style.display = 'block';
+                btn.textContent = '📜 Hide Logs';
+            } else {
+                logsContainer.style.display = 'none';
+                btn.textContent = '📜 Show Logs';
+            }
+        }
+        
+        function formatLogs(logs) {
+            // Highlight important log patterns
+            return logs
+                .replace(/(Installing|Downloading|Cloning|Starting|Activating)/g, '<span class="log-info">$1</span>')
+                .replace(/(Ready|Success|Completed|done)/gi, '<span class="log-success">$1</span>')
+                .replace(/(Warning|warn)/gi, '<span class="log-warning">$1</span>')
+                .replace(/(Error|Failed|Exception)/gi, '<span class="log-error">$1</span>');
         }
 
         function renderPresets(containerId, selected, onClick) {
