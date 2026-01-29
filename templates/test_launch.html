@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMD OneClick - Test Launch</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a24;
+            --accent: #ed1c24;
+            --accent-hover: #ff3b42;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0b0;
+            --border: #2a2a3a;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-secondary);
+            padding: 6px;
+            border-radius: 12px;
+            margin-bottom: 32px;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .tab {
+            padding: 12px 32px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .tab:hover:not(.active) {
+            color: var(--text-primary);
+            background: var(--bg-card);
+        }
+
+        .panel {
+            display: none;
+        }
+
+        .panel.active {
+            display: block;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .card-title .icon {
+            width: 32px;
+            height: 32px;
+            background: var(--accent);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .result-box {
+            margin-top: 24px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            display: none;
+        }
+
+        .result-box.show {
+            display: block;
+        }
+
+        .result-box.success {
+            border-color: var(--success);
+        }
+
+        .result-box.error {
+            border-color: var(--accent);
+        }
+
+        .result-title {
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .result-title.success {
+            color: var(--success);
+        }
+
+        .result-title.error {
+            color: var(--accent);
+        }
+
+        .result-content {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .result-url {
+            display: block;
+            margin-top: 12px;
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            color: var(--success);
+            text-decoration: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        .result-url:hover {
+            background: var(--border);
+        }
+
+        .presets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .preset-card {
+            padding: 16px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preset-card:hover {
+            border-color: var(--text-secondary);
+        }
+
+        .preset-card.selected {
+            border-color: var(--accent);
+            background: rgba(237, 28, 36, 0.1);
+        }
+
+        .preset-card .name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .preset-card .spec {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 AMD OneClick Test</h1>
+            <p>Test launching Notebooks and Spaces with custom configurations</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('notebook')">📓 Notebook</button>
+            <button class="tab" onclick="switchTab('space')">🎯 Space</button>
+        </div>
+
+        <!-- Notebook Panel -->
+        <div id="notebook-panel" class="panel active">
+            <div class="card">
+                <div class="card-title">
+                    <div class="icon">📓</div>
+                    Launch Generic Notebook
+                </div>
+
+                <div class="section-title">Resource Preset</div>
+                <div class="presets-grid" id="notebook-presets"></div>
+
+                <div class="form-group">
+                    <label>Notebook URL</label>
+                    <input type="text" id="notebook-url" placeholder="https://raw.githubusercontent.com/user/repo/main/notebook.ipynb">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Source Platform</label>
+                        <select id="notebook-src">
+                            <option value="direct">Direct</option>
+                            <option value="github">GitHub</option>
+                            <option value="modelscope">ModelScope</option>
+                            <option value="aistudio">AIStudio</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Docker Image (optional)</label>
+                        <select id="notebook-image">
+                            <option value="">Default</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>User Email (optional)</label>
+                        <input type="email" id="notebook-email" placeholder="user@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Conda Environment (optional)</label>
+                        <select id="notebook-conda">
+                            <option value="">None</option>
+                            <option value="python3.10">Python 3.10</option>
+                            <option value="python3.11">Python 3.11</option>
+                            <option value="python3.12">Python 3.12</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" onclick="launchNotebook()" id="notebook-btn">
+                    🚀 Launch Notebook
+                </button>
+
+                <div class="result-box" id="notebook-result">
+                    <div class="result-title" id="notebook-result-title"></div>
+                    <div class="result-content" id="notebook-result-content"></div>
+                    <a class="result-url" id="notebook-result-url" target="_blank" style="display:none;"></a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Space Panel -->
+        <div id="space-panel" class="panel">
+            <div class="card">
+                <div class="card-title">
+                    <div class="icon">🎯</div>
+                    Launch Space
+                </div>
+
+                <div class="section-title">Resource Preset</div>
+                <div class="presets-grid" id="space-presets"></div>
+
+                <div class="form-group">
+                    <label>Repository URL *</label>
+                    <input type="text" id="space-repo" placeholder="https://github.com/user/repo.git">
+                </div>
+
+                <div class="form-group">
+                    <label>Start Command *</label>
+                    <input type="text" id="space-command" placeholder="python app.py" value="python app.py">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Branch</label>
+                        <input type="text" id="space-branch" placeholder="main" value="main">
+                    </div>
+                    <div class="form-group">
+                        <label>Custom Port</label>
+                        <input type="number" id="space-port" placeholder="7860" value="7860">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Source Platform</label>
+                        <select id="space-src">
+                            <option value="direct">Direct</option>
+                            <option value="github">GitHub</option>
+                            <option value="modelscope">ModelScope</option>
+                            <option value="aistudio">AIStudio</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Docker Image (optional)</label>
+                        <select id="space-image">
+                            <option value="">Default</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>User Email (optional)</label>
+                        <input type="email" id="space-email" placeholder="user@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Conda Environment (optional)</label>
+                        <select id="space-conda">
+                            <option value="">None</option>
+                            <option value="python3.10">Python 3.10</option>
+                            <option value="python3.11">Python 3.11</option>
+                            <option value="python3.12">Python 3.12</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Environment Variables (JSON, optional)</label>
+                    <textarea id="space-env" placeholder='{"KEY": "value"}'></textarea>
+                </div>
+
+                <button class="btn btn-primary" onclick="launchSpace()" id="space-btn">
+                    🚀 Launch Space
+                </button>
+
+                <div class="result-box" id="space-result">
+                    <div class="result-title" id="space-result-title"></div>
+                    <div class="result-content" id="space-result-content"></div>
+                    <a class="result-url" id="space-result-url" target="_blank" style="display:none;"></a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let presets = [];
+        let images = [];
+        let selectedNotebookPreset = 'mi300x-1';
+        let selectedSpacePreset = 'mi300x-1';
+
+        // Load config on page load
+        async function loadConfig() {
+            try {
+                // Load presets
+                const presetsRes = await fetch('/api/config/resources');
+                const presetsData = await presetsRes.json();
+                presets = presetsData.presets || [];
+                
+                renderPresets('notebook-presets', selectedNotebookPreset, (id) => {
+                    selectedNotebookPreset = id;
+                    renderPresets('notebook-presets', selectedNotebookPreset, arguments.callee);
+                });
+                renderPresets('space-presets', selectedSpacePreset, (id) => {
+                    selectedSpacePreset = id;
+                    renderPresets('space-presets', selectedSpacePreset, arguments.callee);
+                });
+
+                // Load images
+                const imagesRes = await fetch('/api/config/images');
+                const imagesData = await imagesRes.json();
+                images = imagesData.images || [];
+                
+                populateImageSelect('notebook-image');
+                populateImageSelect('space-image');
+            } catch (error) {
+                console.error('Failed to load config:', error);
+            }
+        }
+
+        function renderPresets(containerId, selected, onClick) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = presets.map(p => `
+                <div class="preset-card ${p.id === selected ? 'selected' : ''}" onclick="selectPreset('${containerId}', '${p.id}')">
+                    <div class="name">${p.name}</div>
+                    <div class="spec">${p.spec.gpu_count > 0 ? p.spec.gpu_type.toUpperCase() + ' x' + p.spec.gpu_count : 'CPU Only'}</div>
+                </div>
+            `).join('');
+        }
+
+        function selectPreset(containerId, presetId) {
+            if (containerId === 'notebook-presets') {
+                selectedNotebookPreset = presetId;
+            } else {
+                selectedSpacePreset = presetId;
+            }
+            renderPresets(containerId, presetId);
+        }
+
+        function populateImageSelect(selectId) {
+            const select = document.getElementById(selectId);
+            images.forEach(img => {
+                const option = document.createElement('option');
+                option.value = img.url;
+                option.textContent = img.key;
+                select.appendChild(option);
+            });
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            
+            document.querySelector(`.tab:nth-child(${tab === 'notebook' ? 1 : 2})`).classList.add('active');
+            document.getElementById(`${tab}-panel`).classList.add('active');
+        }
+
+        function showResult(prefix, success, title, content, url = null) {
+            const box = document.getElementById(`${prefix}-result`);
+            const titleEl = document.getElementById(`${prefix}-result-title`);
+            const contentEl = document.getElementById(`${prefix}-result-content`);
+            const urlEl = document.getElementById(`${prefix}-result-url`);
+
+            box.className = `result-box show ${success ? 'success' : 'error'}`;
+            titleEl.className = `result-title ${success ? 'success' : 'error'}`;
+            titleEl.innerHTML = `${success ? '✅' : '❌'} ${title}`;
+            contentEl.textContent = typeof content === 'object' ? JSON.stringify(content, null, 2) : content;
+
+            if (url) {
+                urlEl.href = url;
+                urlEl.textContent = `🔗 Open: ${url}`;
+                urlEl.style.display = 'block';
+            } else {
+                urlEl.style.display = 'none';
+            }
+        }
+
+        async function launchNotebook() {
+            const btn = document.getElementById('notebook-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Launching...';
+
+            const payload = {
+                notebook_url: document.getElementById('notebook-url').value,
+                src_meta: {
+                    src: document.getElementById('notebook-src').value,
+                    outer_email: document.getElementById('notebook-email').value || null
+                },
+                resource_preset: selectedNotebookPreset
+            };
+
+            const image = document.getElementById('notebook-image').value;
+            if (image) payload.docker_image = image;
+
+            const conda = document.getElementById('notebook-conda').value;
+            if (conda) payload.conda_env = conda;
+
+            try {
+                const response = await fetch('/api/notebook/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showResult('notebook', true, 'Notebook Created!', data, data.url);
+                } else {
+                    showResult('notebook', false, 'Failed to create notebook', data.detail || data);
+                }
+            } catch (error) {
+                showResult('notebook', false, 'Error', error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🚀 Launch Notebook';
+            }
+        }
+
+        async function launchSpace() {
+            const btn = document.getElementById('space-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Launching...';
+
+            const payload = {
+                repo_url: document.getElementById('space-repo').value,
+                start_command: document.getElementById('space-command').value,
+                src_meta: {
+                    src: document.getElementById('space-src').value,
+                    outer_email: document.getElementById('space-email').value || null
+                },
+                resource_preset: selectedSpacePreset,
+                branch: document.getElementById('space-branch').value || 'main'
+            };
+
+            const image = document.getElementById('space-image').value;
+            if (image) payload.docker_image = image;
+
+            const conda = document.getElementById('space-conda').value;
+            if (conda) payload.conda_env = conda;
+
+            const port = document.getElementById('space-port').value;
+            if (port) payload.custom_port = parseInt(port);
+
+            const envVars = document.getElementById('space-env').value;
+            if (envVars) {
+                try {
+                    payload.env_vars = JSON.parse(envVars);
+                } catch (e) {
+                    showResult('space', false, 'Invalid JSON', 'Environment variables must be valid JSON');
+                    btn.disabled = false;
+                    btn.innerHTML = '🚀 Launch Space';
+                    return;
+                }
+            }
+
+            try {
+                const response = await fetch('/api/space/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showResult('space', true, 'Space Created!', data, data.url);
+                } else {
+                    showResult('space', false, 'Failed to create space', data.detail || data);
+                }
+            } catch (error) {
+                showResult('space', false, 'Error', error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🚀 Launch Space';
+            }
+        }
+
+        // Initialize
+        loadConfig();
+    </script>
+</body>
+</html>
+

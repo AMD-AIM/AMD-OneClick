@@ -114,6 +114,15 @@ async def index(request: Request):
     )
 
 
+@app.get("/test", response_class=HTMLResponse)
+async def test_launch_page(request: Request):
+    """Render the test launch page for Notebooks and Spaces"""
+    return templates.TemplateResponse(
+        "test_launch.html",
+        {"request": request}
+    )
+
+
 @app.post("/api/notebook/request", response_model=NotebookStatus)
 async def request_notebook(req: NotebookRequest):
     """Request a notebook instance"""
