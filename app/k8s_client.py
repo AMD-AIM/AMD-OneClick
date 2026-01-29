@@ -819,6 +819,9 @@ else
     fi
 fi
 
+# Set Gradio to listen on all interfaces (required for K8s networking)
+export GRADIO_SERVER_NAME="0.0.0.0"
+
 # Run the start command
 echo "Starting application with: ${START_COMMAND}"
 exec ${START_COMMAND}
