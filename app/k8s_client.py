@@ -773,9 +773,15 @@ fi
 # Install requirements if exists
 if [ -f requirements.txt ]; then
     echo "Installing requirements..."
+    # First, try to install common Space dependencies that might be missing
+    echo "Installing common Space dependencies..."
+    pip install gradio spaces --quiet 2>/dev/null || true
+    
     # Install each package separately to continue even if some fail
     # Skip packages with platform-specific wheels that won't work on ROCm
     while IFS= read -r line || [[ -n "$line" ]]; do
+        # Trim whitespace
+        line=$(echo "$line" | xargs)
         # Skip empty lines and comments
         [[ -z "$line" || "$line" =~ ^# ]] && continue
         # Skip CUDA-specific packages that won't work on ROCm
@@ -784,9 +790,13 @@ if [ -f requirements.txt ]; then
             continue
         fi
         echo "Installing: $line"
-        pip install "$line" --quiet || echo "Warning: Failed to install $line"
+        pip install "$line" --quiet 2>/dev/null || echo "Warning: Failed to install $line"
     done < requirements.txt
     echo "Requirements installation completed"
+else
+    # No requirements.txt, but install common Space dependencies
+    echo "Installing common Space dependencies..."
+    pip install gradio spaces --quiet 2>/dev/null || true
 fi
 
 # Run the start command
