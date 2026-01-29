@@ -773,8 +773,13 @@ fi
 # Try to read Gradio version from README.md (HuggingFace Spaces format)
 GRADIO_VERSION=""
 if [ -f README.md ]; then
-    GRADIO_VERSION=$(grep -oP 'sdk_version:\s*\K[0-9.]+' README.md || true)
-    echo "Found SDK version in README: ${GRADIO_VERSION:-not specified}"
+    # Use sed for better compatibility (grep -P not available in alpine)
+    GRADIO_VERSION=$(sed -n 's/^sdk_version:[[:space:]]*\([0-9.]*\).*/\1/p' README.md | head -1)
+    if [ -n "${GRADIO_VERSION}" ]; then
+        echo "Found SDK version in README: ${GRADIO_VERSION}"
+    else
+        echo "No SDK version found in README"
+    fi
 fi
 
 # Install requirements if exists
