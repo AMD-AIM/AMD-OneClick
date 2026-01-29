@@ -773,7 +773,20 @@ fi
 # Install requirements if exists
 if [ -f requirements.txt ]; then
     echo "Installing requirements..."
-    pip install -r requirements.txt || echo "Warning: Some requirements failed to install"
+    # Install each package separately to continue even if some fail
+    # Skip packages with platform-specific wheels that won't work on ROCm
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip empty lines and comments
+        [[ -z "$line" || "$line" =~ ^# ]] && continue
+        # Skip CUDA-specific packages that won't work on ROCm
+        if [[ "$line" =~ "cu1" ]] || [[ "$line" =~ "flash_attn" ]] || [[ "$line" =~ "flash-attn" ]]; then
+            echo "Skipping CUDA-specific package: $line"
+            continue
+        fi
+        echo "Installing: $line"
+        pip install "$line" --quiet || echo "Warning: Failed to install $line"
+    done < requirements.txt
+    echo "Requirements installation completed"
 fi
 
 # Run the start command
