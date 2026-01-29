@@ -13,10 +13,10 @@ from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
 try:
-    from .config_ppocr import settings
+    from .config import settings
 except ImportError:
     try:
-        from .config import settings
+        from .config_ppocr import settings
     except ImportError:
         from config import settings
 

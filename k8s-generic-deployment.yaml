@@ -70,7 +70,7 @@ data:
   MAX_LIFETIME_HOURS: "12"
   
   # Service Configuration
-  SERVICE_HOST: "129.212.240.184"  # TODO: Update with domain later
+  SERVICE_HOST: "129.212.240.57"  # TODO: Update with domain later
   NODE_PORT_BASE: "30100"
   NOTEBOOK_TOKEN: "amd-oneclick"
 
@@ -103,7 +103,7 @@ spec:
       serviceAccountName: amd-oneclick-manager
       containers:
         - name: manager
-          image: docker.io/vivienfanghua/amd-oneclick-manager:latest
+          image: docker.io/vivienfanghua/amd-oneclick-manager:v2-general
           imagePullPolicy: Always
           workingDir: /app
           ports:
